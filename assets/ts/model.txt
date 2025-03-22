@@ -1,0 +1,18 @@
+import { Model } from 'bnjsx';
+
+/**
+ * Each instance of this model corresponds to a row in the `[tableName]` table.
+ *
+ * @extends `Model`
+ */
+export class [className] extends Model {
+  /**
+   * The name of the table associated with this model.
+   */
+  protected static table = '[tableName]';
+
+  /**
+   * List of columns to ignore during updates.
+   */
+  protected static ignore = ['id', 'created_at', 'updated_at'];
+}

@@ -1,0 +1,23 @@
+import { Command } from 'bnjsx';
+
+/**
+ * This is a base command template for creating a custom command.
+ *
+ * @extends `Command`
+ */
+export class [className] extends Command {
+  /**
+  * Define the command syntax, as the following:
+  * - `<! name>`: required argument
+  * - `<? name>`: optional argument
+  * - `<- name>`: option
+  */
+  protected static syntax = '';
+
+  /**
+   * This method is called when the command is executed.
+   */
+  public static exec(): any {
+    // Your command logic here...
+  }
+}

@@ -1,0 +1,39 @@
+const { Seeder } = require('bnjsx');
+
+/**
+ * This class is responsible for populating the `[tableName]` table with fake data.
+ *
+ * @extends Seeder
+ */
+class [className] extends Seeder {
+  /**
+   * Creates a seeder instance.
+   */
+  constructor() {
+    super();
+
+    this.set.rows(10); // Insert 10 rows
+    this.set.table('[tableName]'); // Into [tableName] table
+  }
+
+   /**
+   * Defines the layout for a single row.
+   *
+   * @returns A row of fake data matching the table schema.
+   */
+  layout() {
+    const faker = this.get.faker(); // Access the Faker instance
+
+    return {
+      // Example of generating fake data for various columns
+      name: faker.firstName(),  // Generates a random first name
+      email: faker.email(),     // Generates a random email address
+      address: faker.address(), // Generates a random address
+      phone: faker.phone('+1 (###) ###-####'), // Generates a random phone number
+      created_at: faker.datetime(),  // Generates a random datetime
+      updated_at: faker.datetime(),  // Generates a random datetime
+    };
+  }
+}
+
+module.exports = new [className](); // export new instance

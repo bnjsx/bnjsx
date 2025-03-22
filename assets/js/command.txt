@@ -1,0 +1,25 @@
+const { Command } = require('bnjsx');
+
+/**
+ * This is a base command template for creating a custom command.
+ *
+ * @extends `Command`
+ */
+class [className] extends Command {
+  /**
+  * Define the command syntax, as the following:
+  * - `<! name>`: required argument
+  * - `<? name>`: optional argument
+  * - `<- name>`: option
+  */
+  static syntax = '';
+
+  /**
+  * This method is called when the command is executed.
+  */
+  static exec() {
+    // Your command logic here...
+  }
+}
+
+module.exports = { [className] };
