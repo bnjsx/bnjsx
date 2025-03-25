@@ -2,7 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
-## **[1.0.3] - 2025-03-25**
+## Bnjsx@1.0.4 - 2025-03-26
+
+### **Added**
+
+- **Vite Integration for Better Development Experience**  
+  Introduced seamless Vite support with automatic asset handling for both development and production environments.
+
+#### **Setup Instructions**
+
+1. Import and register vite in your `bnjsx.config.js`:
+
+```js
+const { vite } = require('bnjsx');
+
+module.exports = {
+  tools: { vite }, // Register Vite tool
+};
+```
+
+2. Use it in your templates:
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Automatic asset injection -->
+    $(@vite('/assets/css/style.css', '/assets/ts/app.ts'))
+  </head>
+  <body>
+    $place('body')
+  </body>
+</html>
+```
+
+## Bnjsx@1.0.3 - 2025-03-25
 
 ### **Changed**
 
@@ -17,7 +51,7 @@ All notable changes to this project will be documented in this file.
 
 These changes improve installation stability and reduce potential headaches for **BNJSX** users.
 
-## [1.0.2] - 2025-03-21
+## Bnjsx@1.0.2 - 2025-03-21
 
 ### Changed
 
@@ -54,7 +88,7 @@ These changes improve installation stability and reduce potential headaches for 
   - This occurred when running a **globally installed `bnjsx`** while using a **locally installed version**, leading to instance validation conflicts.
   - The fix ensures that the `config` module correctly handles clusters from **both local and global installations**, improving compatibility.
 
-## [1.0.1] - 2025-03-21
+## Bnjsx@1.0.1 - 2025-03-21
 
 ### Fixed
 
@@ -62,6 +96,6 @@ These changes improve installation stability and reduce potential headaches for 
   - Example (previously broken): `$if(@getUser().name == 'simon') $('Greet simon!') $endif`
   - This syntax is now **fully supported**.
 
-## [1.0.0] - 2025-03-07
+## Bnjsx@1.0.0 - 2025-03-07
 
 - **Initial release of `bnjsx`**.

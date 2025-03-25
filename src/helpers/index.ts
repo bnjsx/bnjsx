@@ -8,6 +8,7 @@ export * from './modules/Text';
 export * from './modules/UTC';
 export * from './modules/Zone';
 export * from './modules/Config';
+export * from './tools/Vite';
 
 /**
  * Checks if the given object is a valid `MegaDriver`.
