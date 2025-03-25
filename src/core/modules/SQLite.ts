@@ -1,10 +1,10 @@
-import { Database } from 'sqlite3';
+import Database from 'better-sqlite3';
 
 // Driver & Connection
 import { Driver, Connection, Rows } from './Driver';
 
 // Helpers
-import { isArr, isDefined, isError, isNum, isStr } from '../../helpers';
+import { isArr, isNum, isStr } from '../../helpers';
 
 // Errors
 import {
@@ -115,139 +115,128 @@ export class SQLite implements Driver {
    */
   public create(): Promise<Connection> {
     return new Promise((resolve, reject) => {
-      // Create connection using SQLite3
-      const db = new Database(this.path, (error) => {
-        if (isError(error)) {
-          return reject(new CreateConnectionError(error.message));
-        }
+      try {
+        // Create connection using SQLite3
+        const db = new Database(this.path);
 
         // Enable foreign key constraints
-        db.run('PRAGMA foreign_keys = ON', undefined, (error) => {
-          if (isError(error)) {
-            return reject(new CreateConnectionError(error.message));
-          }
+        db.pragma('foreign_keys = ON');
+        db.pragma('journal_mode = WAL');
 
-          const sqlite: Connection = {
-            id: Symbol('Connection'),
-            driver: this,
-            query(sql: string, values: Array<string | number>) {
-              return new Promise((resolve, reject) => {
-                if (!isStr(sql)) {
+        const sqlite: Connection = {
+          id: Symbol('Connection'),
+          driver: this,
+          query(sql: string, values?: Array<string | number>) {
+            return new Promise((resolve, reject) => {
+              if (!isStr(sql)) {
+                return reject(new QueryError(`Invalid query: ${String(sql)}`));
+              }
+
+              values === undefined ? (values = []) : values;
+
+              if (!isArr(values)) {
+                return reject(
+                  new QueryError(`Invalid query values: ${String(values)}`)
+                );
+              }
+
+              values.forEach((value) => {
+                if (!isNum(value) && !isStr(value)) {
                   return reject(
-                    new QueryError(`Invalid query: ${String(sql)}`)
+                    new QueryError(`Invalid query value: ${String(value)}`)
                   );
                 }
+              });
 
-                if (isDefined(values)) {
-                  if (!isArr(values)) {
-                    return reject(
-                      new QueryError(`Invalid query values: ${String(values)}`)
-                    );
-                  }
-
-                  values.forEach((value) => {
-                    if (!isNum(value) && !isStr(value)) {
-                      return reject(
-                        new QueryError(`Invalid query value: ${String(value)}`)
-                      );
-                    }
-                  });
-                }
-
+              try {
                 // Handle SELECT queries
                 if (/^\s*SELECT/i.test(sql)) {
-                  return db.all(sql, values, (error, rows) => {
-                    if (isError(error)) {
-                      return reject(new QueryError(error.message));
-                    }
-
-                    return resolve(rows as Rows);
-                  });
+                  return resolve(db.prepare(sql).all(...values) as Rows);
                 }
 
-                // Handle other query types
-                db.run(sql, values, function (error) {
-                  if (error) return reject(new QueryError(error.message));
+                const info = db.prepare(sql).run(...values);
 
-                  // Handle INSERT queries
-                  if (/^\s*INSERT/i.test(sql)) {
-                    // Check if it was a single insert or bulk insert
-                    if (this.changes === 1) {
-                      return resolve(this.lastID); // Return the last inserted ID for single inserts
-                    }
-
-                    return resolve(undefined); // Return undefined for bulk insert
+                // Handle INSERT queries
+                if (/^\s*INSERT/i.test(sql)) {
+                  // Check if it was a single insert or bulk insert
+                  if (info.changes === 1) {
+                    // Return the last inserted ID for single inserts
+                    return resolve(info.lastInsertRowid as number);
                   }
+                }
 
-                  return resolve(undefined);
-                });
-              });
-            },
-            close() {
-              return new Promise((resolve, reject) => {
-                db.close((error) => {
-                  if (isError(error)) {
-                    return reject(new CloseConnectionError(error.message));
-                  }
+                // Return undefined for bulk insert and everything else..
+                return resolve(undefined);
+              } catch (error) {
+                return reject(new QueryError(error.message));
+              }
+            });
+          },
+          close() {
+            return new Promise((resolve, reject) => {
+              try {
+                db.close();
 
-                  const assign = (Error: any) => {
-                    return function reject() {
-                      return Promise.reject(
-                        new Error(
-                          'Cannot perform further operations once the connection is closed'
-                        )
-                      );
-                    };
+                const assign = (Error: any) => {
+                  return function reject() {
+                    return Promise.reject(
+                      new Error(
+                        'Cannot perform further operations once the connection is closed'
+                      )
+                    );
                   };
+                };
 
-                  // Reset
-                  sqlite.close = assign(CloseConnectionError);
-                  sqlite.query = assign(QueryError);
-                  sqlite.beginTransaction = assign(BeginTransactionError);
-                  sqlite.commit = assign(CommitTransactionError);
-                  sqlite.rollback = assign(RollbackTransactionError);
+                // Reset
+                sqlite.close = assign(CloseConnectionError);
+                sqlite.query = assign(QueryError);
+                sqlite.beginTransaction = assign(BeginTransactionError);
+                sqlite.commit = assign(CommitTransactionError);
+                sqlite.rollback = assign(RollbackTransactionError);
 
-                  // Resolve
-                  resolve();
-                });
-              });
-            },
-            beginTransaction() {
-              return new Promise<void>((resolve, reject) => {
-                return sqlite
-                  .query('BEGIN TRANSACTION;')
-                  .then(() => resolve())
-                  .catch((error) =>
-                    reject(new BeginTransactionError(error.message))
-                  );
-              });
-            },
-            commit() {
-              return new Promise<void>((resolve, reject) => {
-                return sqlite
-                  .query('COMMIT;')
-                  .then(() => resolve())
-                  .catch((error) =>
-                    reject(new CommitTransactionError(error.message))
-                  );
-              });
-            },
-            rollback() {
-              return new Promise((resolve, reject) => {
-                return sqlite
-                  .query('ROLLBACK;')
-                  .then(() => resolve())
-                  .catch((error) =>
-                    reject(new RollbackTransactionError(error.message))
-                  );
-              });
-            },
-          };
+                // Resolve
+                resolve();
+              } catch (error) {
+                return reject(new CloseConnectionError(error.message));
+              }
+            });
+          },
+          beginTransaction() {
+            return new Promise<void>((resolve, reject) => {
+              return sqlite
+                .query('BEGIN TRANSACTION;')
+                .then(() => resolve())
+                .catch((error) =>
+                  reject(new BeginTransactionError(error.message))
+                );
+            });
+          },
+          commit() {
+            return new Promise<void>((resolve, reject) => {
+              return sqlite
+                .query('COMMIT;')
+                .then(() => resolve())
+                .catch((error) =>
+                  reject(new CommitTransactionError(error.message))
+                );
+            });
+          },
+          rollback() {
+            return new Promise((resolve, reject) => {
+              return sqlite
+                .query('ROLLBACK;')
+                .then(() => resolve())
+                .catch((error) =>
+                  reject(new RollbackTransactionError(error.message))
+                );
+            });
+          },
+        };
 
-          // Resolve
-          resolve(sqlite);
-        });
-      });
+        return resolve(sqlite);
+      } catch (error) {
+        reject(new CreateConnectionError(error.message));
+      }
     });
   }
 }

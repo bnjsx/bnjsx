@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## **[1.0.3] - 2025-03-25**
+
+### **Changed**
+
+- **Replaced `sqlite3` with `better-sqlite3`**
+
+  - `sqlite3` had build issues and too many deprecation warnings during installation.
+  - `better-sqlite3` is actively maintained and provides a more reliable experience.
+
+- **Replaced `bcrypt` with `bcryptjs`**
+  - `bcrypt` had build issues and hasn't been updated in over two years.
+  - Switching to `bcryptjs` ensures compatibility without build problems.
+
+These changes improve installation stability and reduce potential headaches for **BNJSX** users.
+
 ## [1.0.2] - 2025-03-21
 
 ### Changed

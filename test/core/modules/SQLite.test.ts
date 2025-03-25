@@ -1,642 +1,263 @@
-jest.mock('sqlite3');
+import Database from 'better-sqlite3';
+import { SQLite } from '../../../src';
+import {
+  CreateConnectionError,
+  QueryError,
+  CloseConnectionError,
+  BeginTransactionError,
+  CommitTransactionError,
+  RollbackTransactionError,
+} from '../../../src/errors';
 
-import sqlite from 'sqlite3';
-
-import { SQLite } from '../../../src/core';
-import { QueryError } from '../../../src/errors';
-import { CreateConnectionError } from '../../../src/errors';
-import { CloseConnectionError } from '../../../src/errors';
-import { BeginTransactionError } from '../../../src/errors';
-import { CommitTransactionError } from '../../../src/errors';
-import { RollbackTransactionError } from '../../../src/errors';
-import { isCon, isSQLite, isSymbol } from '../../../src/helpers';
-
-const mock = () => {
-  return {
-    db: (...reject: Array<string>) => {
-      const db = {
-        close: jest.fn((callback) => callback(null)),
-        run: jest.fn((sql, values, callback) => {
-          // console.log(typeof callback);
-          callback(null);
-        }),
-        all: jest.fn((sql, values, callback) => {
-          // console.log(typeof callback);
-          callback(null, [{ name: 'simon' }]);
-        }),
-      };
-
-      if (reject.includes('run')) {
-        db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      }
-
-      if (reject.includes('all')) {
-        db.all = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      }
-
-      if (reject.includes('close')) {
-        db.close = jest.fn((callback) => callback(new Error('ops')));
-      }
-
-      return db;
-    },
-  };
-};
-
-describe('SQLite', () => {
-  describe('SQLite.create', () => {
-    beforeEach(() => {
-      jest.clearAllMocks();
+describe('SQLite Driver', () => {
+  describe('Constructor', () => {
+    it('should create instance with valid file path', () => {
+      const driver = new SQLite(':memory:');
+      expect(driver).toBeInstanceOf(SQLite);
+      expect(driver.id).toBeDefined();
+      expect(typeof driver.id === 'symbol').toBe(true);
     });
 
-    it('should resolve with a Connection', async () => {
-      const db = mock().db();
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const path = ':memory';
-      const driver = new SQLite(path);
-      const connection = await driver.create();
-
-      expect(connection).toBeInstanceOf(Object);
-      expect(isCon(connection)).toBe(true);
-      expect(isSQLite(driver)).toBe(true);
-
-      expect(sqlite.Database).toHaveBeenCalledWith(path, expect.any(Function));
-      expect(sqlite.Database).toHaveBeenCalledTimes(1);
-
-      // reference the driver form the connection
-      expect(connection.driver).toBe(driver);
-
-      // Enable foreign key constraints
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenCalledWith(
-        'PRAGMA foreign_keys = ON',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should resolve with a new Connection every time', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const path = ':memory';
-
-      const connection1 = await new SQLite(path).create();
-      const connection2 = await new SQLite(path).create();
-
-      expect(connection1 === connection2).toBe(false);
-    });
-
-    it('should reject with a CreateConnectionError', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(() => callback(new Error('ops')), 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const path = ':memory';
-
-      await expect(new SQLite(path).create()).rejects.toThrow(
-        CreateConnectionError
-      );
-
-      expect(sqlite.Database).toHaveBeenCalledWith(path, expect.any(Function));
-      expect(sqlite.Database).toHaveBeenCalledTimes(1);
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db('run'); // db.run rejects
-      }) as any;
-
-      // Enable foreign key constraints rejects
-      await expect(new SQLite(path).create()).rejects.toThrow(
-        CreateConnectionError
-      );
-    });
-
-    it('path must be string', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const path = ':memory';
-
-      expect(() => new SQLite(path)).not.toThrow(CreateConnectionError);
-      expect(() => new SQLite([] as any)).toThrow(CreateConnectionError);
+    it('should throw CreateConnectionError with invalid path type', () => {
+      expect(() => new SQLite(null as any)).toThrow(CreateConnectionError);
       expect(() => new SQLite(123 as any)).toThrow(CreateConnectionError);
-
-      expect(sqlite.Database).toHaveBeenCalledTimes(0);
+      expect(() => new SQLite(undefined as any)).toThrow(CreateConnectionError);
+      expect(() => new SQLite({} as any)).toThrow(CreateConnectionError);
     });
   });
 
-  describe('Connection.props', () => {
-    it('should have access to the driver', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const driver = new SQLite(':memory');
+  describe('create()', () => {
+    it('should create a connection with in-memory database', async () => {
+      const driver = new SQLite(':memory:');
       const connection = await driver.create();
-
-      expect(connection.driver).toBeInstanceOf(SQLite);
-      expect(driver).toBe(driver);
+      expect(connection).toBeDefined();
+      expect(connection.id).toBeDefined();
+      expect(connection.driver).toBe(driver);
+      await connection.close();
     });
 
-    it('should have a unique id', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const driver = new SQLite(':memory');
-      const connection1 = await driver.create();
-      expect(isSymbol(connection1.id)).toBe(true);
-
-      const connection2 = await driver.create();
-      expect(isSymbol(connection2.id)).toBe(true);
-      expect(connection2.id !== connection1.id).toBe(true);
-      expect(connection1.driver === connection2.driver).toBe(true);
-    });
-  });
-
-  describe('Connection.query', () => {
-    it('should resolves with the result', async () => {
-      const db = mock().db();
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-      const sql = 'SELECT;';
-      const values = [];
-
-      await expect(connection.query(sql, values)).resolves.toEqual([
-        { name: 'simon' },
-      ]);
-
-      expect(db.all).toHaveBeenCalledTimes(1);
-      expect(db.all).toHaveBeenCalledWith(sql, values, expect.any(Function));
-    });
-
-    it('should reject with QueryError', async () => {
-      const db = mock().db('all'); // db.all rejects
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-      const sql = 'SELECT;';
-      const values = [];
-
-      await expect(connection.query(sql, values)).rejects.toThrow(QueryError);
-
-      expect(db.all).toHaveBeenCalledTimes(1);
-      expect(db.all).toHaveBeenCalledWith(sql, values, expect.any(Function));
-    });
-
-    it('should reject with ops', async () => {
-      const db = mock().db('all'); // db.all rejects
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-      const sql = 'SELECT;';
-      const values = [];
-
-      await expect(connection.query(sql, values)).rejects.toThrow('ops');
-
-      expect(db.all).toHaveBeenCalledTimes(1);
-      expect(db.all).toHaveBeenCalledWith(sql, values, expect.any(Function));
-    });
-
-    it('query must be string', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.query(123 as any)).rejects.toThrow(
-        'Invalid query'
-      );
-      await expect(connection.query([] as any)).rejects.toThrow(
-        'Invalid query'
-      );
-      await expect(connection.query({} as any)).rejects.toThrow(
-        'Invalid query'
-      );
-    });
-
-    it('values must be an array', async () => {
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return mock().db();
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.query('sql')).resolves.not.toThrow();
-      await expect(connection.query('sql', undefined)).resolves.not.toThrow();
-      await expect(connection.query('sql', [])).resolves.not.toThrow();
-      await expect(connection.query('sql', [1, 2])).resolves.not.toThrow();
-      await expect(connection.query('sql', ['simon'])).resolves.not.toThrow();
-
-      await expect(connection.query('sql', {} as any)).rejects.toThrow(
-        'Invalid query values'
-      );
-
-      await expect(connection.query('sql', 123 as any)).rejects.toThrow(
-        'Invalid query values'
-      );
-
-      await expect(connection.query('sql', [{} as any])).rejects.toThrow(
-        'Invalid query value'
-      );
-    });
-
-    it('should resolve with Rows for SELECT queries', async () => {
-      const db = mock().db(); // db.all rejects
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.query('SELECT', [])).resolves.toEqual([
-        { name: 'simon' },
-      ]);
-
-      expect(db.all).toHaveBeenCalledTimes(1);
-      expect(db.all).toHaveBeenCalledWith('SELECT', [], expect.any(Function));
-    });
-
-    it('should resolve with id for single INSERT queries', async () => {
-      const db = mock().db();
-      db.run = jest.fn(function (sql, values, callback) {
-        // Mock the `this` context to simulate SQLite's behavior
-        this.changes = 1; // Simulate a single insert
-        this.lastID = 1; // Set the last inserted ID
-        callback.call(this, null); // Call the callback with `this` context
+    it('should reject with a CreateConnectionError if there is an issue', async () => {
+      jest.resetModules(); // Reset modules to mock better-sqlite3
+      // Temporarily mock better-sqlite3 for this test
+      jest.doMock('better-sqlite3', () => {
+        return jest.fn(() => {
+          throw new Error('Database connection failed');
+        });
       });
 
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes after db is resolved
-        return db;
-      }) as any;
+      // Re-import the module after mocking
+      const { SQLite } = require('../../../src');
+      const { CreateConnectionError } = require('../../../src/errors');
 
-      const connection = await new SQLite(':memory').create();
+      const driver = new SQLite(':memory:');
+      await expect(driver.create()).rejects.toThrow(CreateConnectionError);
 
-      await expect(connection.query('INSERT', [])).resolves.toBe(1);
+      // Restore original implementation after the test
+      jest.dontMock('better-sqlite3');
+      jest.resetModules(); // Reset again to avoid affecting other tests
+    });
+  });
 
-      expect(db.run).toHaveBeenCalledTimes(2);
-      expect(db.run).toHaveBeenCalledWith('INSERT', [], expect.any(Function));
+  describe('Connection', () => {
+    let driver: SQLite;
+    let connection: any;
+
+    beforeEach(async () => {
+      driver = new SQLite(':memory:');
+      connection = await driver.create();
+      // Create test table
+      await connection.query(
+        'CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)'
+      );
     });
 
-    it('should resolve with undefined for bulk INSERT queries', async () => {
-      const db = mock().db();
-      db.run = jest.fn(function (sql, values, callback) {
-        // Mock the `this` context to simulate SQLite's behavior
-        this.changes = 3; // Simulate a bulk insert
-        this.lastID = 1; // Set the last inserted ID (not used in this case)
-        callback.call(this, null); // Call the callback with `this` context
+    afterEach(async () => {
+      if (connection && typeof connection.close === 'function') {
+        await connection.close().catch(() => {});
+      }
+    });
+
+    describe('query()', () => {
+      it('should execute SELECT queries and return rows', async () => {
+        const result = await connection.query('SELECT 1 as value');
+        expect(result).toEqual([{ value: 1 }]);
       });
 
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes after db is resolved
-        return db;
-      }) as any;
+      it('should execute INSERT queries and return lastInsertRowid for single insert', async () => {
+        const id = await connection.query(
+          'INSERT INTO test (name, age) VALUES (?, ?)',
+          ['Alice', 30]
+        );
+        expect(typeof id).toBe('number');
+        expect(id).toBeGreaterThan(0);
 
-      const connection = await new SQLite(':memory').create();
+        // Verify the insert worked
+        const rows = await connection.query('SELECT * FROM test WHERE id = ?', [
+          id,
+        ]);
+        expect(rows.length).toBe(1);
+        expect(rows[0].name).toBe('Alice');
+      });
 
-      await expect(connection.query('INSERT', [])).resolves.toBe(undefined);
+      it('should execute bulk INSERT and return undefined', async () => {
+        const result = await connection.query(
+          'INSERT INTO test (name, age) VALUES (?, ?), (?, ?)',
+          ['Alice', 30, 'Bob', 25]
+        );
+        expect(result).toBeUndefined();
 
-      expect(db.run).toHaveBeenCalledTimes(2);
-      expect(db.run).toHaveBeenCalledWith('INSERT', [], expect.any(Function));
+        // Verify both records were inserted
+        const rows = await connection.query('SELECT * FROM test');
+        expect(rows.length).toBe(2);
+      });
+
+      it('should execute UPDATE queries and return undefined', async () => {
+        await connection.query('INSERT INTO test (name, age) VALUES (?, ?)', [
+          'Alice',
+          30,
+        ]);
+        const result = await connection.query(
+          'UPDATE test SET age = ? WHERE name = ?',
+          [31, 'Alice']
+        );
+        expect(result).toBeUndefined();
+
+        // Verify update
+        const rows = await connection.query(
+          'SELECT age FROM test WHERE name = ?',
+          ['Alice']
+        );
+        expect(rows[0].age).toBe(31);
+      });
+
+      it('should reject with QueryError for invalid SQL', async () => {
+        await expect(connection.query(123 as any)).rejects.toThrow(QueryError);
+      });
+
+      it('should reject with QueryError for invalid values', async () => {
+        await expect(
+          connection.query('SELECT * FROM test', 'not-an-array' as any)
+        ).rejects.toThrow(QueryError);
+        await expect(
+          connection.query('SELECT * FROM test WHERE id = ?', [{}])
+        ).rejects.toThrow(QueryError);
+      });
+
+      it('should reject with QueryError for invalid query', async () => {
+        await expect(connection.query('INVALID SQL QUERY')).rejects.toThrow(
+          QueryError
+        );
+      });
     });
 
-    it('should resolve with undefined for other queries', async () => {
-      const db = mock().db(); // db.all rejects
+    describe('close()', () => {
+      it('should close the connection', async () => {
+        await expect(connection.close()).resolves.not.toThrow();
+      });
 
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
+      it('should prevent further operations after close', async () => {
+        await connection.close();
 
-      const connection = await new SQLite(':memory').create();
+        await expect(connection.query('SELECT 1')).rejects.toThrow(QueryError);
+        await expect(connection.beginTransaction()).rejects.toThrow(
+          BeginTransactionError
+        );
+        await expect(connection.commit()).rejects.toThrow(
+          CommitTransactionError
+        );
+        await expect(connection.rollback()).rejects.toThrow(
+          RollbackTransactionError
+        );
+        await expect(connection.close()).rejects.toThrow(CloseConnectionError);
+      });
 
-      await expect(connection.query('DELETE')).resolves.toBeUndefined();
+      it('should reject with CloseConnectionError if closing fails', async () => {
+        // Spy on the prototype of Database and override the close method
+        const closeSpy = jest
+          .spyOn(Database.prototype, 'close')
+          .mockImplementation(() => {
+            throw new Error('Close failed');
+          });
 
-      expect(db.run).toHaveBeenCalledTimes(2);
-      expect(db.run).toHaveBeenCalledWith(
-        'DELETE',
-        undefined,
-        expect.any(Function)
-      );
-    });
-  });
+        await expect(connection.close()).rejects.toThrow(CloseConnectionError);
 
-  describe('Connection.close', () => {
-    it('should resolve with undefined', async () => {
-      const db = mock().db();
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.close()).resolves.toBeUndefined();
-
-      expect(db.close).toHaveBeenCalledTimes(1);
-      expect(db.close).toHaveBeenCalledWith(expect.any(Function));
+        // Restore original close method
+        closeSpy.mockRestore();
+      });
     });
 
-    it('should reject with CloseConnectionError', async () => {
-      const db = mock().db('close'); // db.close rejects
+    describe('Transactions', () => {
+      it('should begin a transaction', async () => {
+        await expect(connection.beginTransaction()).resolves.not.toThrow();
+      });
 
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
+      it('should commit a transaction', async () => {
+        await connection.beginTransaction();
+        await expect(connection.commit()).resolves.not.toThrow();
+      });
 
-      const connection = await new SQLite(':memory').create();
+      it('should rollback a transaction', async () => {
+        await connection.beginTransaction();
+        await expect(connection.rollback()).resolves.not.toThrow();
+      });
 
-      await expect(connection.close()).rejects.toThrow(CloseConnectionError);
+      it('should reject with BeginTransactionError if begin fails', async () => {
+        // Force a failure
+        connection.query = jest.fn().mockRejectedValue(new Error('ops'));
+        await expect(connection.beginTransaction()).rejects.toThrow(
+          BeginTransactionError
+        );
+      });
 
-      expect(db.close).toHaveBeenCalledTimes(1);
-      expect(db.close).toHaveBeenCalledWith(expect.any(Function));
+      it('should reject with CommitTransactionError if commit fails', async () => {
+        // Force a failure
+        connection.query = jest.fn().mockRejectedValue(new Error('ops'));
+        await expect(connection.commit()).rejects.toThrow(
+          CommitTransactionError
+        );
+      });
+
+      it('should reject with RollbackTransactionError if rollback fails', async () => {
+        // Force a failure
+        connection.query = jest.fn().mockRejectedValue(new Error('ops'));
+        await expect(connection.rollback()).rejects.toThrow(
+          RollbackTransactionError
+        );
+      });
+
+      it('should properly handle transactions with data', async () => {
+        await connection.beginTransaction();
+
+        await connection.query('INSERT INTO test (name, age) VALUES (?, ?)', [
+          'Alice',
+          30,
+        ]);
+
+        // Data should be visible within the transaction
+        const rowsBeforeCommit = await connection.query('SELECT * FROM test');
+        expect(rowsBeforeCommit.length).toBe(1);
+
+        await connection.rollback();
+
+        // After rollback, data should not be visible
+        const rowsAfterRollback = await connection.query('SELECT * FROM test');
+        expect(rowsAfterRollback.length).toBe(0);
+      });
     });
 
-    it('should reject with ops', async () => {
-      const db = mock().db('close'); // db.close rejects
+    describe('Foreign Keys', () => {
+      it('should enable foreign key constraints', async () => {
+        // Create tables with foreign key relationship
+        await connection.query('CREATE TABLE parent (id INTEGER PRIMARY KEY)');
+        await connection.query(
+          'CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER, FOREIGN KEY(parent_id) REFERENCES parent(id))'
+        );
 
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.close()).rejects.toThrow('ops');
-
-      expect(db.close).toHaveBeenCalledTimes(1);
-      expect(db.close).toHaveBeenCalledWith(expect.any(Function));
-    });
-
-    it('cannot execute any farther operations', async () => {
-      const db = mock().db(); // db.close resolves
-
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executes afer db is resolved
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.close()).resolves.toBeUndefined(); // closed
-
-      // all operations rejects
-      await expect(connection.close()).rejects.toThrow(CloseConnectionError);
-      await expect(connection.close()).rejects.toThrow(
-        'Cannot perform further operations once the connection is closed'
-      );
-
-      await expect(connection.query('SELECT 1;')).rejects.toThrow(QueryError);
-      await expect(connection.query('SELECT 1;')).rejects.toThrow(
-        'Cannot perform further operations once the connection is closed'
-      );
-
-      await expect(connection.beginTransaction()).rejects.toThrow(
-        BeginTransactionError
-      );
-      await expect(connection.beginTransaction()).rejects.toThrow(
-        'Cannot perform further operations once the connection is closed'
-      );
-
-      await expect(connection.commit()).rejects.toThrow(CommitTransactionError);
-      await expect(connection.commit()).rejects.toThrow(
-        'Cannot perform further operations once the connection is closed'
-      );
-
-      await expect(connection.rollback()).rejects.toThrow(
-        RollbackTransactionError
-      );
-
-      await expect(connection.rollback()).rejects.toThrow(
-        'Cannot perform further operations once the connection is closed'
-      );
-    });
-  });
-
-  describe('Connection.beginTransaction', () => {
-    it('should resolve with undefined', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.beginTransaction()).resolves.toBeUndefined();
-
-      expect(db.run).toHaveBeenCalledTimes(2);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'BEGIN TRANSACTION;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should reject with BeginTransactionError', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      // Make run rejects
-      db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      await expect(connection.beginTransaction()).rejects.toThrow(
-        BeginTransactionError
-      );
-
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'BEGIN TRANSACTION;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should reject with ops', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      // Make run rejects
-      db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      await expect(connection.beginTransaction()).rejects.toThrow('ops');
-
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'BEGIN TRANSACTION;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-  });
-
-  describe('Connection.commit', () => {
-    it('should resolve with undefined', async () => {
-      const db = mock().db();
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executed after db instance is created
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.commit()).resolves.toBeUndefined();
-
-      expect(db.run).toHaveBeenCalledTimes(2);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'COMMIT;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should reject with CommitTransactionError', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      // Make run rejects
-      db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      await expect(connection.commit()).rejects.toThrow(CommitTransactionError);
-
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'COMMIT;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should reject with ops', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      // Make run rejects
-      db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      await expect(connection.commit()).rejects.toThrow('ops');
-
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'COMMIT;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-  });
-
-  describe('Connection.rollback', () => {
-    it('should resolve with undefined', async () => {
-      const db = mock().db();
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1); // Executed after db instance is created
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      await expect(connection.rollback()).resolves.toBeUndefined();
-
-      expect(db.run).toHaveBeenCalledTimes(2);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'ROLLBACK;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should reject with RollbackTransactionError', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      // Make run rejects
-      db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      await expect(connection.rollback()).rejects.toThrow(
-        RollbackTransactionError
-      );
-
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'ROLLBACK;',
-        undefined,
-        expect.any(Function)
-      );
-    });
-
-    it('should reject with ops', async () => {
-      const db = mock().db(); // run resolves
-      sqlite.Database = jest.fn((path, callback) => {
-        setTimeout(callback, 1);
-        return db;
-      }) as any;
-
-      const connection = await new SQLite(':memory').create();
-
-      // Make run rejects
-      db.run = jest.fn((sql, values, callback) => callback(new Error('ops')));
-      await expect(connection.rollback()).rejects.toThrow('ops');
-
-      expect(db.run).toHaveBeenCalledTimes(1);
-      expect(db.run).toHaveBeenLastCalledWith(
-        'ROLLBACK;',
-        undefined,
-        expect.any(Function)
-      );
+        // Try to violate foreign key constraint
+        await expect(
+          connection.query('INSERT INTO child (parent_id) VALUES (1)')
+        ).rejects.toThrow(QueryError);
+      });
     });
   });
 });

@@ -5,5 +5,8 @@ test/
 .gitignore
 jest.config.js
 tsconfig.json
+bnjsx.config.js
+database.sqlite
 CONTRIBUTING.md
 LICENSE.md
+CHANGELOG.md

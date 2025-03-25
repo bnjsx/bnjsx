@@ -1,4 +1,4 @@
-jest.mock('bcrypt');
+jest.mock('bcryptjs');
 jest.mock('jsonwebtoken');
 jest.mock('../../../src/core/template/Component', () => ({
   render: jest.fn(() => 'component'),
@@ -31,7 +31,7 @@ import { BadRequestError, ForbiddenError } from '../../../src/errors';
 import { render } from '../../../src/core/template/Component';
 import { UTC } from '../../../src/helpers';
 
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 describe('Auth', () => {

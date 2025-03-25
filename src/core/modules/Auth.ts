@@ -11,7 +11,7 @@ import { ForbiddenError, BadRequestError } from '../../errors';
 import { appKey } from './App';
 import { ref } from '..';
 
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 /**
