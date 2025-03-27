@@ -98,30 +98,85 @@ describe('Auth', () => {
       const auth = new Auth(options);
       expect(auth['messages'].invalidEmail).toBe('Custom error');
     });
+  });
 
-    it('should initialize form fields correctly', () => {
-      const auth = new Auth({ mailer: mockMailer });
+  describe('Auth Validation Testers', () => {
+    let auth: Auth;
 
-      expect(auth.form['fields']).toHaveProperty('email');
-      expect(auth.form['fields'].email).toEqual([
-        { test: expect.any(Function), message: auth['messages'].invalidEmail },
-        { test: expect.any(Function), message: auth['messages'].longEmail },
-      ]);
+    beforeEach(() => {
+      auth = new Auth({ mailer: jest.fn() });
+    });
 
-      expect(auth.form['fields']).toHaveProperty('password');
-      expect(auth.form['fields'].password).toEqual([
-        { test: expect.any(Function), message: auth['messages'].shortPassword },
-        { test: expect.any(Function), message: auth['messages'].longPassword },
-        { test: expect.any(Function), message: auth['messages'].weakPassword },
-      ]);
+    // Email Tests
+    test('should validate a correct email', () => {
+      expect(auth.testers.email[0].test('valid@example.com', {})).toBeTruthy();
+    });
 
-      // Test the actual validation logic
-      expect(auth.form['fields'].email[0].test('invalid-email')).toBe(false); // invalid
-      expect(auth.form['fields'].email[1].test('a'.repeat(251))).toBe(false); // long
+    test('should invalidate an incorrect email', () => {
+      expect(auth.testers.email[0].test('invalid-email', {})).toBeFalsy();
+    });
 
-      expect(auth.form['fields'].password[0].test('short')).toBe(false); // short
-      expect(auth.form['fields'].password[1].test('a'.repeat(21))).toBe(false); // long
-      expect(auth.form['fields'].password[2].test('hello123')).toBe(false); // weak
+    test('should allow an email shorter than 250 characters', () => {
+      expect(
+        auth.testers.email[1].test('a'.repeat(30) + '@example.com', {})
+      ).toBeTruthy();
+    });
+
+    test('should reject an email longer than 250 characters', () => {
+      expect(
+        auth.testers.email[1].test('a'.repeat(251) + '@example.com', {})
+      ).toBeFalsy();
+    });
+
+    // Password Tests
+    test('should allow a password with at least 8 characters', () => {
+      expect(auth.testers.password[0].test('Pass1234', {})).toBeTruthy();
+    });
+
+    test('should reject a password shorter than 8 characters', () => {
+      expect(auth.testers.password[0].test('1234567', {})).toBeFalsy();
+    });
+
+    test('should allow a password shorter than 20 characters', () => {
+      expect(auth.testers.password[1].test('Pass1234', {})).toBeTruthy();
+    });
+
+    test('should reject a password longer than 20 characters', () => {
+      expect(auth.testers.password[1].test('a'.repeat(21), {})).toBeFalsy();
+    });
+
+    test('should validate a strong password', () => {
+      expect(auth.testers.password[2].test('StrongPass123!', {})).toBeTruthy();
+    });
+
+    test('should reject a weak password', () => {
+      expect(auth.testers.password[2].test('weakpass', {})).toBeFalsy();
+    });
+
+    // Terms Tests
+    test('should accept terms if value is a string', () => {
+      expect(auth.testers.terms[0].test('accepted', {})).toBeTruthy();
+    });
+
+    test('should reject terms if value is not a string', () => {
+      expect(auth.testers.terms[0].test(null as any, {})).toBeFalsy();
+    });
+
+    // Confirmation Tests
+    test('should validate matching passwords', () => {
+      expect(
+        auth.testers.confirmation[0].test('password123', {
+          password: 'password123',
+        })
+      ).toBeTruthy();
+    });
+
+    test('should reject non-matching passwords', () => {
+      expect(
+        auth.testers.confirmation[0].test('wrongpassword', {
+          password: 'password123',
+        })
+      ).toBeFalsy();
     });
   });
 
@@ -135,7 +190,7 @@ describe('Auth', () => {
 
       req = {
         getHeader: jest.fn(),
-        fields: { email: 'test@example.com', password: 'pass@123' },
+        body: { email: 'test@example.com', password: 'pass@123' },
       };
 
       res = { cookie: jest.fn() };
@@ -143,8 +198,8 @@ describe('Auth', () => {
       jest.clearAllMocks();
     });
 
-    it('should throw BadRequestError if req.fields is missing', async () => {
-      req.fields = undefined;
+    it('should throw BadRequestError if req.body is missing', async () => {
+      req.body = undefined;
       await expect(auth.register(req, res)).rejects.toThrow(BadRequestError);
     });
 
@@ -228,7 +283,7 @@ describe('Auth', () => {
 
       req = {
         getHeader: jest.fn(),
-        fields: { email: 'test@example.com', password: 'pass@123' },
+        body: { email: 'test@example.com', password: 'pass@123' },
       };
 
       res = { cookie: jest.fn() };
@@ -236,8 +291,8 @@ describe('Auth', () => {
       jest.clearAllMocks();
     });
 
-    it('should throw BadRequestError if req.fields is missing', async () => {
-      req.fields = undefined;
+    it('should throw BadRequestError if req.body is missing', async () => {
+      req.body = undefined;
       await expect(auth.login(req, res)).rejects.toThrow(BadRequestError);
     });
 
@@ -338,7 +393,7 @@ describe('Auth', () => {
     });
   });
 
-  describe('mail', () => {
+  describe('requestReset', () => {
     let auth: any;
     let req: any;
     let res: any;
@@ -348,7 +403,7 @@ describe('Auth', () => {
 
       req = {
         getHeader: jest.fn(),
-        fields: { email: 'test@example.com' },
+        body: { email: 'test@example.com' },
         protocol: 'http',
         host: 'localhost',
         port: '3000',
@@ -359,25 +414,27 @@ describe('Auth', () => {
       jest.clearAllMocks();
     });
 
-    it('should throw BadRequestError if req.fields is missing', async () => {
-      req.fields = undefined;
-      await expect(auth.mail(req, res)).rejects.toThrow(BadRequestError);
+    it('should throw BadRequestError if req.body is missing', async () => {
+      req.body = undefined;
+      await expect(auth.requestReset(req, res)).rejects.toThrow(
+        BadRequestError
+      );
     });
 
     it('should resolve early if there are validation errors', async () => {
       req.errors = { email: ['Invalid email'] };
-      await expect(auth.mail(req, res)).resolves.toBeUndefined();
+      await expect(auth.requestReset(req, res)).resolves.toBeUndefined();
     });
 
     it('should resolve if the email is not found', async () => {
       connection.query.mockResolvedValueOnce([]);
-      await expect(auth.mail(req, res)).resolves.toBeUndefined();
+      await expect(auth.requestReset(req, res)).resolves.toBeUndefined();
     });
 
     it('should insert a reset token and send an email if user exists', async () => {
       connection.query.mockResolvedValueOnce([{ email: 'test@example.com' }]);
 
-      await expect(auth.mail(req, res)).resolves.toBeUndefined();
+      await expect(auth.requestReset(req, res)).resolves.toBeUndefined();
 
       // Check user lookup
       expect(connection.query).toHaveBeenCalledWith(
@@ -407,7 +464,7 @@ describe('Auth', () => {
     });
   });
 
-  describe('reset', () => {
+  describe('passwordReset', () => {
     let auth: any;
     let req: any;
     let res: any;
@@ -418,7 +475,7 @@ describe('Auth', () => {
       req = {
         getHeader: jest.fn(),
         params: { token: 'test-token' },
-        fields: { password: 'newPass@123' },
+        body: { password: 'newPass@123' },
       };
 
       res = {};
@@ -428,29 +485,29 @@ describe('Auth', () => {
       jest.clearAllMocks();
     });
 
-    it('should throw BadRequestError if req.fields is missing', async () => {
-      req.fields = undefined;
-      await expect(auth.reset(req, res)).rejects.toThrow(
+    it('should throw BadRequestError if req.body is missing', async () => {
+      req.body = undefined;
+      await expect(auth.passwordReset(req, res)).rejects.toThrow(
         'No fields found for authentication.'
       );
     });
 
     it('should throw BadRequestError if req.params.token is missing', async () => {
       req.params.token = undefined;
-      await expect(auth.reset(req, res)).rejects.toThrow(
+      await expect(auth.passwordReset(req, res)).rejects.toThrow(
         'Invalid or expired token.'
       );
     });
 
     it('should resolve early if there are validation errors', async () => {
       req.errors = { password: ['Invalid password'] };
-      await expect(auth.reset(req, res)).resolves.toBeUndefined();
+      await expect(auth.passwordReset(req, res)).resolves.toBeUndefined();
     });
 
     it('should return error if token is invalid or expired', async () => {
       connection.query.mockResolvedValueOnce([]);
 
-      await expect(auth.reset(req, res)).rejects.toThrow(
+      await expect(auth.passwordReset(req, res)).rejects.toThrow(
         'Invalid or expired token.'
       );
 
@@ -466,7 +523,7 @@ describe('Auth', () => {
 
       auth.updatedAt = false;
 
-      await expect(auth.reset(req, res)).resolves.toBeUndefined();
+      await expect(auth.passwordReset(req, res)).resolves.toBeUndefined();
 
       expect(connection.query).toHaveBeenLastCalledWith(
         'UPDATE users SET password = ? WHERE email = ?;',
@@ -479,7 +536,7 @@ describe('Auth', () => {
       connection.query.mockResolvedValueOnce([{ email: 'test@example.com' }]);
       (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
 
-      await expect(auth.reset(req, res)).resolves.toBeUndefined();
+      await expect(auth.passwordReset(req, res)).resolves.toBeUndefined();
 
       expect(connection.query).toHaveBeenLastCalledWith(
         'UPDATE users SET password = ?, updated_at = ? WHERE email = ?;',
@@ -763,8 +820,8 @@ describe('Auth', () => {
       expect(instance.register).toBeInstanceOf(Function);
       expect(instance.login).toBeInstanceOf(Function);
       expect(instance.logout).toBeInstanceOf(Function);
-      expect(instance.mail).toBeInstanceOf(Function);
-      expect(instance.reset).toBeInstanceOf(Function);
+      expect(instance.passwordReset).toBeInstanceOf(Function);
+      expect(instance.requestReset).toBeInstanceOf(Function);
     });
   });
 });

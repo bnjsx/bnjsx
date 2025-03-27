@@ -103,12 +103,20 @@ export interface FileOptions {
  */
 export interface Tester {
   /**
-   * Function to test the validity of a field value.
+   * Validates the given field value.
    *
-   * - Returns `true` if the test passes, meaning the value is valid.
-   * - Returns `false` if the test fails, meaning the value is invalid.
+   * @template B - The expected type for the `body` values, which can be
+   *               `undefined`, `string`, an array of strings, or a `File`.
+   *
+   * @param value - The field value to be tested.
+   * @param body - The full request body containing other fields.
+   *
+   * @returns Returns `true` if the value is valid, otherwise `false`.
    */
-  test: (value: string) => boolean;
+  test: <B extends undefined | string | Array<string> | File>(
+    value: string,
+    body: Record<string, B>
+  ) => boolean;
 
   /** Error message to display if validation fails. */
   message: string;
@@ -278,6 +286,27 @@ export class Form {
   }
 
   /**
+   * Validates all field values in the request body against their respective test functions.
+   *
+   * - Iterates through all defined fields and applies validation tests.
+   * - If a test fails, the corresponding error message is registered.
+   *
+   * @returns This function does not return a value.
+   */
+  private testFields(): true {
+    Object.keys(this.fields).forEach((key) => {
+      this.fields[key].forEach((tester) => {
+        const value = this.req.body ? this.req.body[key] : undefined;
+        if (!tester.test(value, this.req.body || {})) {
+          this.addError(key, tester.message);
+        }
+      });
+    });
+
+    return true;
+  }
+
+  /**
    * Parses the incoming request data as URL-encoded form data.
    *
    * This method listens for 'data' events from the request stream, accumulating
@@ -314,17 +343,10 @@ export class Form {
                 if (this.mode === 'ignore') continue;
               }
 
-              const messages = new Array();
-
-              this.fields[key].forEach((tester) => {
-                if (!tester.test(value)) messages.push(tester.message);
-              });
-
-              if (isEmptyArr(messages)) this.addField(key, value);
-              else this.addError(key, ...messages);
+              this.addField(key, value);
             }
 
-            resolve();
+            this.testFields() && resolve();
           })
         );
       });
@@ -353,7 +375,7 @@ export class Form {
         (e) => !this.issue && ((this.issue = true), reject(e))
       );
 
-      this.bb.on('close', () => !this.issue && resolve());
+      this.bb.on('close', () => !this.issue && this.testFields() && resolve());
 
       this.res.on('finish', () => {
         if (this.issue) {
@@ -381,14 +403,7 @@ export class Form {
           if (this.mode === 'ignore') return;
         }
 
-        const messages = new Array();
-
-        this.fields[name].forEach((tester) => {
-          if (!tester.test(value)) messages.push(tester.message);
-        });
-
-        if (isEmptyArr(messages)) this.addField(name, value);
-        else this.addError(name, ...messages);
+        this.addField(name, value);
       });
 
       this.bb.on('file', (name, readStream, { mimeType, filename }) => {
@@ -415,7 +430,7 @@ export class Form {
           if (this.files[name].required) {
             this.issue = true;
             this.addError(name, this.files[name].messages.required);
-            return readStream.resume(), resolve();
+            return readStream.resume(), this.testFields() && resolve();
           }
 
           readStream.resume();
@@ -429,7 +444,7 @@ export class Form {
         if (this.count[name] > this.files[name].count) {
           this.issue = true;
           this.addError(name, this.files[name].messages.count);
-          return readStream.resume(), resolve();
+          return readStream.resume(), this.testFields() && resolve();
         }
 
         // Type Check
@@ -437,7 +452,7 @@ export class Form {
           if (!this.files[name].type.includes(mimeType)) {
             this.issue = true;
             this.addError(name, this.files[name].messages.type);
-            return readStream.resume(), resolve();
+            return readStream.resume(), this.testFields() && resolve();
           }
         }
 
@@ -461,7 +476,7 @@ export class Form {
             if (size > this.files[name].size.max) {
               this.issue = true;
               this.addError(name, this.files[name].messages.size.max);
-              return readStream.resume(), resolve();
+              return readStream.resume(), this.testFields() && resolve();
             }
           }
         });
@@ -471,7 +486,7 @@ export class Form {
             if (size < this.files[name].size.min) {
               this.issue = true;
               this.addError(name, this.files[name].messages.size.min);
-              return readStream.resume(), resolve();
+              return readStream.resume(), this.testFields() && resolve();
             }
 
             this.addFile(name, { name: filename, path, size, type: mimeType });

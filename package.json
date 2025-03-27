@@ -1,6 +1,6 @@
 {
   "name": "bnjsx",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "dist/index.js",
   "types": "dist/types/index.d.ts",
   "author": "Essefri Mohamed",
@@ -23,7 +23,7 @@
     "url": "https://github.com/bnjsx/bnjsx"
   },
   "scripts": {
-    "test": "npx jest --coverage",
+    "test": "jest --coverage",
     "build": "tsc",
     "watch": "tsc -watch"
   },

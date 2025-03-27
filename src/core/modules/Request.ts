@@ -45,6 +45,9 @@ export interface Request<
   /** The parsed body of the request. */
   body: B;
 
+  /** Form validation errors. */
+  errors: Record<string, Array<string>>;
+
   /** Allows additional dynamic properties. */
   [key: string]: any;
 

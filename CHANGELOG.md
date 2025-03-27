@@ -2,9 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## Bnjsx@1.0.5 - 2025-03-27
+
+### Added
+
+- **Custom Validation Support**  
+  You can now define custom validation rules for every form field.
+
+  ```js
+  const auth = Auth.break({ mailer });
+
+  // Ensure password & confirmation match in `register` form
+  auth.validation.register.confirmation = {
+    test: (value, body) => value === body.password,
+    message: 'Passwords do not match',
+  };
+  ```
+
+- **Flexible Validation Control**
+  - Disable validation for all forms:
+    ```js
+    auth.validation = {};
+    ```
+  - Disable validation for a specific form:
+    ```js
+    auth.validation.login = undefined;
+    ```
+  - Remove validation for a single field:
+    ```js
+    auth.validation.register.terms = undefined;
+    ```
+
 ## Bnjsx@1.0.4 - 2025-03-26
 
-### **Added**
+### Added
 
 - **Vite Integration for Better Development Experience**  
   Introduced seamless Vite support with automatic asset handling for both development and production environments.
@@ -38,7 +69,7 @@ module.exports = {
 
 ## Bnjsx@1.0.3 - 2025-03-25
 
-### **Changed**
+### Changed
 
 - **Replaced `sqlite3` with `better-sqlite3`**
 

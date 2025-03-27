@@ -1,4 +1,4 @@
-import { Form } from './Form';
+import { Form, Tester } from './Form';
 import { Request } from './Request';
 import { CookieOptions, Response } from './Response';
 import { render } from '../template/Component';
@@ -55,6 +55,12 @@ export type AuthMessages = {
 
   /** User not found in the system. */
   userNotFound?: string;
+
+  /** You must accept the terms to continue. */
+  termsNotAccepted?: string;
+
+  /** Passwords do not match. */
+  passwordMismatch?: string;
 };
 
 /**
@@ -133,11 +139,6 @@ export class AuthError extends Error {}
  */
 export class Auth extends Controller {
   /**
-   * Form instance for handling authentication-related form data.
-   */
-  public form = new Form();
-
-  /**
    * Mailer function for sending emails, required for password reset functionality.
    */
   private mailer: Mailer;
@@ -202,6 +203,105 @@ export class Auth extends Controller {
     weakPassword: 'Password must contain letters, numbers, and symbols.',
     emailTaken: 'This email is already registered.',
     userNotFound: 'Invalid email or password.',
+    termsNotAccepted: 'You must accept the terms to continue.',
+    passwordMismatch: 'Passwords do not match.',
+  };
+
+  /**
+   * Collection of form instances for different authentication methods.
+   * - `register`: Handles validation for user registration.
+   * - `login`: Handles validation for user login.
+   * - `reset`: Handles validation for password reset.
+   * - `mail`: Handles validation for password reset requests.
+   */
+  public forms: Record<string, Form> = {
+    register: new Form(),
+    login: new Form(),
+    passwordReset: new Form(),
+    requestReset: new Form(),
+  };
+
+  /**
+   * Collection of validation testers for different form fields.
+   * - `email`: Validation tests for the email field, including format and length checks.
+   * - `password`: Validation tests for the password field, including length and strength checks.
+   * - `terms`: Validation test for the terms acceptance field.
+   * - `confirmation`: Validation test to ensure the password confirmation matches the original password.
+   */
+  public testers: Record<
+    'email' | 'password' | 'terms' | 'confirmation',
+    Array<Tester>
+  > = {
+    email: [
+      {
+        test: (email) => isEmail(email),
+        message: this.messages.invalidEmail,
+      },
+      {
+        test: (email) => email && email.length < 250,
+        message: this.messages.longEmail,
+      },
+    ],
+    password: [
+      {
+        test: (pass) => pass && pass.length >= 8,
+        message: this.messages.shortPassword,
+      },
+      {
+        test: (pass) => pass && pass.length < 20,
+        message: this.messages.longPassword,
+      },
+      {
+        test: (pass) => isPassword(pass),
+        message: this.messages.weakPassword,
+      },
+    ],
+    terms: [
+      {
+        test: (value) => typeof value === 'string',
+        message: this.messages.termsNotAccepted,
+      },
+    ],
+    confirmation: [
+      {
+        test: (pass, body) => pass && pass === body.password,
+        message: this.messages.passwordMismatch,
+      },
+    ],
+  };
+
+  /**
+   * Defines validation testers for each authentication form.
+   *
+   * This structure provides flexibility by allowing different forms to have specific
+   * field validations. If a field should not be validated for a particular form,
+   * simply remove it from the corresponding object.
+   *
+   * - `register`: Validates email, password, and terms acceptance.
+   * - `login`: Validates email and password only.
+   * - `passwordReset`: Validates password and its confirmation.
+   * - `requestReset`: Validates email for password reset requests.
+   */
+  public validation: Record<
+    'register' | 'login' | 'passwordReset' | 'requestReset',
+    Record<string, Array<Tester>>
+  > = {
+    register: {
+      email: this.testers.email,
+      password: this.testers.password,
+      terms: this.testers.terms,
+    },
+    login: {
+      email: this.testers.email,
+      password: this.testers.password,
+    },
+    passwordReset: {
+      password: this.testers.password,
+      confirmation: this.testers.confirmation,
+    },
+    requestReset: {
+      email: this.testers.email,
+    },
   };
 
   /**
@@ -258,34 +358,6 @@ export class Auth extends Controller {
     if (['lazy', 'smart'].includes(options.mode)) {
       this.mode = options.mode;
     }
-
-    this.form.field(
-      'email',
-      {
-        test: (email: string) => isEmail(email),
-        message: this.messages.invalidEmail,
-      },
-      {
-        test: (email: string) => email.length < 250,
-        message: this.messages.longEmail,
-      }
-    );
-
-    this.form.field(
-      'password',
-      {
-        test: (passwrd: string) => passwrd.length >= 8,
-        message: this.messages.shortPassword,
-      },
-      {
-        test: (passwrd: string) => passwrd.length < 20,
-        message: this.messages.longPassword,
-      },
-      {
-        test: (passwrd: string) => isPassword(passwrd),
-        message: this.messages.weakPassword,
-      }
-    );
   }
 
   /**
@@ -309,19 +381,25 @@ export class Auth extends Controller {
    * @returns Resolves when the registration process is complete.
    */
   public async register(req: Request, res: Response): Promise<void> {
-    await this.form.parse(req, res);
-
-    if (!req.fields) {
-      throw new BadRequestError('No fields found for authentication.');
+    if (isObj(this.validation.register)) {
+      Object.keys(this.validation.register).forEach((key) => {
+        this.forms.register.field(key, ...this.validation.register[key]);
+      });
     }
 
+    await this.forms.register.parse(req, res);
+
     if (req.errors) return;
+
+    if (!req.body) {
+      throw new BadRequestError('No fields found for authentication.');
+    }
 
     const users = await this.builder((builder) =>
       builder
         .select()
         .from('users')
-        .where((col) => col('email').equal(req.fields.email))
+        .where((col) => col('email').equal(req.body.email))
         .exec()
     );
 
@@ -330,8 +408,8 @@ export class Auth extends Controller {
       return;
     }
 
-    const hash = await bcrypt.hash(req.fields.password, 10);
-    const row = { email: req.fields.email, password: hash };
+    const hash = await bcrypt.hash(req.body.password, 10);
+    const row = { email: req.body.email, password: hash };
 
     if (this.createdAt) {
       row[this.createdAt] = UTC.get.datetime();
@@ -343,7 +421,7 @@ export class Auth extends Controller {
 
     if (this.mode === 'smart') {
       // Create JWT token
-      const token = jwt.sign({ email: req.fields.email }, appKey(), {
+      const token = jwt.sign({ email: req.body.email }, appKey(), {
         expiresIn: this.expires,
       });
 
@@ -375,19 +453,25 @@ export class Auth extends Controller {
    * @returns Resolves when the login process is complete.
    */
   public async login(req: Request, res: Response): Promise<void> {
-    await this.form.parse(req, res);
-
-    if (!req.fields) {
-      throw new BadRequestError('No fields found for authentication.');
+    if (isObj(this.validation.login)) {
+      Object.keys(this.validation.login).forEach((key) => {
+        this.forms.login.field(key, ...this.validation.login[key]);
+      });
     }
 
+    await this.forms.login.parse(req, res);
+
     if (req.errors) return;
+
+    if (!req.body) {
+      throw new BadRequestError('No fields found for authentication.');
+    }
 
     const user = await this.builder((builder) =>
       builder
         .select()
         .from('users')
-        .where((col) => col('email').equal(req.fields.email))
+        .where((col) => col('email').equal(req.body.email))
         .first()
     );
 
@@ -396,7 +480,7 @@ export class Auth extends Controller {
       return;
     }
 
-    if (!(await bcrypt.compare(req.fields.password, user.password as string))) {
+    if (!(await bcrypt.compare(req.body.password, user.password as string))) {
       req.errors = { email: [this.messages.userNotFound] };
       return;
     }
@@ -452,20 +536,29 @@ export class Auth extends Controller {
    * @throws `BadRequestError` If no fields are found in the request.
    * @returns Resolves when the email is sent.
    */
-  public async mail(req: Request, res: Response): Promise<void> {
-    await this.form.parse(req, res);
-
-    if (!req.fields) {
-      throw new BadRequestError('No fields found for authentication.');
+  public async requestReset(req: Request, res: Response): Promise<void> {
+    if (isObj(this.validation.requestReset)) {
+      Object.keys(this.validation.requestReset).forEach((key) => {
+        this.forms.requestReset.field(
+          key,
+          ...this.validation.requestReset[key]
+        );
+      });
     }
 
+    await this.forms.requestReset.parse(req, res);
+
     if (req.errors) return;
+
+    if (!req.body) {
+      throw new BadRequestError('No fields found for authentication.');
+    }
 
     const user = await this.builder((builder) =>
       builder
         .select()
         .from('users')
-        .where((col) => col('email').equal(req.fields.email))
+        .where((col) => col('email').equal(req.body.email))
         .first()
     );
 
@@ -480,7 +573,7 @@ export class Auth extends Controller {
         .insert()
         .into('reset_tokens')
         .row({
-          email: req.fields.email,
+          email: req.body.email,
           token: createHash('sha256').update(token).digest('hex'),
           expires_at: UTC.future.minute(10),
         })
@@ -489,7 +582,7 @@ export class Auth extends Controller {
 
     const link = `${req.protocol}://${req.host}:${req.port}/${this.base}/${token}`;
     const body = await render(this.component, { link });
-    await this.mailer(req.fields.email, this.subject, body);
+    await this.mailer(req.body.email, this.subject, body);
   }
 
   /**
@@ -511,18 +604,27 @@ export class Auth extends Controller {
    * @throws `BadRequestError` If the token is missing, invalid, or expired.
    * @returns Resolves when the password is successfully reset.
    */
-  public async reset(req: Request, res: Response): Promise<void> {
-    await this.form.parse(req, res);
+  public async passwordReset(req: Request, res: Response): Promise<void> {
+    if (isObj(this.validation.passwordReset)) {
+      Object.keys(this.validation.passwordReset).forEach((key) => {
+        this.forms.passwordReset.field(
+          key,
+          ...this.validation.passwordReset[key]
+        );
+      });
+    }
 
-    if (!req.fields) {
+    await this.forms.passwordReset.parse(req, res);
+
+    if (req.errors) return;
+
+    if (!req.body) {
       throw new BadRequestError('No fields found for authentication.');
     }
 
     if (!req.params.token) {
       throw new BadRequestError('Invalid or expired token.');
     }
-
-    if (req.errors) return;
 
     const token = createHash('sha256').update(req.params.token).digest('hex');
 
@@ -545,7 +647,7 @@ export class Auth extends Controller {
       throw new BadRequestError('Invalid or expired token.');
     }
 
-    const hash = await bcrypt.hash(req.fields.password, 10);
+    const hash = await bcrypt.hash(req.body.password, 10);
     const row = { password: hash };
 
     if (this.updatedAt) {
@@ -683,8 +785,8 @@ export class Auth extends Controller {
     instance.register = instance.register.bind(instance);
     instance.login = instance.login.bind(instance);
     instance.logout = instance.logout.bind(instance);
-    instance.mail = instance.mail.bind(instance);
-    instance.reset = instance.reset.bind(instance);
+    instance.requestReset = instance.requestReset.bind(instance);
+    instance.passwordReset = instance.passwordReset.bind(instance);
 
     return instance;
   }
