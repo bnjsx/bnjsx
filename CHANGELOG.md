@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@1.0.6 - 2025-03-29**
+
+### **Changed**
+
+- **App is now a Singleton**
+  - Previously, users could create multiple `App` instances, but **Bnjsx now enforces a single app instance per project**.
+  - All configurations, and settings are now **centralized in `bnjsx.config.js`**.
+  - If you need multiple apps, simply create separate Bnjsx projects.
+
+### **Added**
+
+- **Improved Error Handling & Debugging**
+  - Introduced helper functions to **display errors and messages more cleanly in development mode**.
+
 ## Bnjsx@1.0.5 - 2025-03-27
 
 ### Added

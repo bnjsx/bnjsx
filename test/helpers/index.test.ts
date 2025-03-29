@@ -6,6 +6,11 @@ import {
   isCon,
   isPendingCon,
   isPoolCon,
+  bugger,
+  orange,
+  blue,
+  green,
+  red,
 } from '../../src/helpers';
 
 describe('isDriver', () => {
@@ -189,5 +194,38 @@ describe('isPoolCon', () => {
   it('should return false for a connection with a non-symbol id', () => {
     const connection = { id: 'PoolConnection' }; // id is a string, not a symbol
     expect(isPoolCon(connection)).toBe(false);
+  });
+});
+
+describe('Color Functions', () => {
+  test('red function should wrap text in red ANSI codes', () => {
+    expect(red('error')).toBe('\x1b[31merror\x1b[0m');
+  });
+
+  test('green function should wrap text in green ANSI codes', () => {
+    expect(green('success')).toBe('\x1b[32msuccess\x1b[0m');
+  });
+
+  test('blue function should wrap text in blue ANSI codes', () => {
+    expect(blue('info')).toBe('\x1b[36minfo\x1b[0m');
+  });
+
+  test('orange function should wrap text in yellow ANSI codes', () => {
+    expect(orange('warning')).toBe('\x1b[33mwarning\x1b[0m');
+  });
+});
+
+describe('Bugger Function', () => {
+  test('bugger should log formatted error message', () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+    const error = new Error('Test error');
+    bugger(error);
+
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('❌  ERROR OCCURRED')
+    );
+
+    consoleSpy.mockRestore();
   });
 });

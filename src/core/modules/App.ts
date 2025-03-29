@@ -9,9 +9,17 @@ import { Router } from './Router';
 import { Request } from './Request';
 import { Response } from './Response';
 import { isAbsolute, normalize, resolve as resolver } from 'path';
-import { isArr, isArrOfStr, isChildOf, isFullArr, isFunc } from '../../helpers';
+import {
+  green,
+  isArr,
+  isArrOfStr,
+  isChildOf,
+  isFullArr,
+  isFunc,
+  orange,
+} from '../../helpers';
 import { AppOptions, config, OriginFunc } from '../../config';
-import { isInt, isObj, isPromise, isStr } from '../../helpers';
+import { bugger, isPromise, isStr } from '../../helpers';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../errors';
 import { isTrue, UTC } from '../../helpers';
 
@@ -517,6 +525,8 @@ export function csrf(req: Request, res: Response): Promise<void> {
  * It supports both HTTP and HTTPS protocols, middleware management, routing, and graceful start/stop operations.
  */
 export class App extends EventEmitter {
+  private static app: App;
+
   /**
    * HTTP or HTTPS server instance.
    */
@@ -540,93 +550,36 @@ export class App extends EventEmitter {
   /**
    * Application options with default values.
    */
-  private options: AppOptions = {
-    env: 'dev',
-    mode: 'web',
-    protocol: 'http',
-    host: 'localhost',
-    port: 2025,
-  };
+  private options: AppOptions;
 
   /**
-   * Creates an instance of the `App` class.
-   *
-   * @param options Custom options to configure the app.
-   * @throws `AppError` if invalid options are provided.
+   * Creates an instance of the `App` class following the Singleton pattern.
+   * Ensures only one instance of the `App` class is created throughout the application.
    */
-  constructor(options?: AppOptions) {
+  constructor() {
     super();
 
-    if (options) {
-      if (!isObj(options)) throw new AppError('Invalid app options provided');
+    // Return the same instance
+    if (App.app instanceof App) return App.app;
 
-      // Check for valid port (should be a positive integer)
-      if (options.port) {
-        if (!isInt(options.port) || options.port < 0)
-          throw new AppError('Invalid port provided');
-        else this.options.port = options.port;
-      }
-
-      // Check for valid host (should be a string)
-      if (options.host) {
-        if (!isStr(options.host)) throw new AppError('Invalid host provided');
-        else this.options.host = options.host;
-      }
-
-      // Check for valid key (should be a string)
-      if (options.key) {
-        if (!isStr(options.key)) throw new AppError('Invalid key provided');
-        else this.options.key = options.key;
-      }
-
-      // Check for valid cert (should be a string)
-      if (options.cert) {
-        if (!isStr(options.cert)) throw new AppError('Invalid cert provided');
-        else this.options.cert = options.cert;
-      }
-
-      // Check for valid env (should be 'dev' or 'pro')
-      if (options.env) {
-        if (!['dev', 'pro'].includes(options.env))
-          throw new AppError('Invalid environment provided');
-        else this.options.env = options.env;
-      }
-
-      // Check for valid env (should be 'web' or 'api')
-      if (options.mode) {
-        if (!['web', 'api'].includes(options.mode))
-          throw new AppError('Invalid mode provided');
-        else this.options.mode = options.mode;
-      }
-
-      // Check for valid protocol (should be 'http' or 'https')
-      if (options.protocol) {
-        if (!['http', 'https'].includes(options.protocol))
-          throw new AppError('Invalid protocol provided');
-        else this.options.protocol = options.protocol;
-      }
-
-      if (options.cert && !options.key) throw new AppError('Missing https key');
-      if (options.key && !options.cert)
-        throw new AppError('Missing https cert');
-    }
+    this.options = config().loadSync();
 
     // Choose server based on protocol
-    if (this.options.protocol === 'http') {
-      this.server = http.createServer(this.process.bind(this));
-      return;
-    }
+    if (this.options.protocol === 'https') {
+      if (!isStr(this.options.key) || !isStr(this.options.cert)) {
+        throw new AppError('For HTTPS, key and cert must be provided');
+      }
 
-    if (!this.options.key || !this.options.cert) {
-      throw new AppError('For HTTPS, key and cert must be provided');
-    }
+      const httpsOptions = {
+        key: fs.readFileSync(this.options.key),
+        cert: fs.readFileSync(this.options.cert),
+      };
 
-    const httpsOptions = {
-      key: fs.readFileSync(this.options.key),
-      cert: fs.readFileSync(this.options.cert),
-    };
+      this.server = https.createServer(httpsOptions, this.process.bind(this));
+    } else this.server = http.createServer(this.process.bind(this));
 
-    this.server = https.createServer(httpsOptions, this.process.bind(this));
+    // Keep a reference to the first instance
+    App.app = this;
   }
 
   /**
@@ -675,7 +628,11 @@ export class App extends EventEmitter {
           if (error) return reject(error);
 
           const { protocol, host, port } = this.options;
-          console.log(`Server is running on ${protocol}://${host}:${port}`);
+          console.log(
+            orange('  💡  Server is running on: ').concat(
+              `${protocol}://${host}:${port}`
+            )
+          );
 
           // After Start
           this.emit(STARTED);
@@ -700,7 +657,7 @@ export class App extends EventEmitter {
       this.server.close((error?: Error) => {
         if (error) return reject(error);
 
-        console.log('Server stopped gracefully');
+        console.log(orange('  💡  Server stopped gracefully'));
 
         // After Stop
         this.emit(STOPPED);
@@ -719,7 +676,7 @@ export class App extends EventEmitter {
    */
   private handler(req: Request, res: Response, err: Error): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (this.options.env === 'dev') console.log(err);
+      if (this.options.env === 'dev') bugger(err);
 
       if (isFullArr(this.handlers)) {
         return this.execute(this.handlers, req, res, err)
