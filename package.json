@@ -1,6 +1,6 @@
 {
   "name": "bnjsx",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "main": "dist/index.js",
   "types": "dist/types/index.d.ts",
   "author": "Essefri Mohamed",

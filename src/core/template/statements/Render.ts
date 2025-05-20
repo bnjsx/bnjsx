@@ -189,18 +189,19 @@ export class Render {
       const index = match.index;
 
       if (tag === '$replace') {
-        if (openingTags.length > 0) {
+        openingTags.push(index);
+      } else if (tag === '$endreplace') {
+        const openingTag = openingTags.pop() as number;
+
+        if (!openingTag) {
           throw new SyntaxError(
             `Unexpected $replace tag found in '${
               this.name
             }' at line number ${parseLine(template, index, this.line)}`
           );
         }
-        openingTags.push(index);
-      } else if (tag === '$endreplace') {
-        const openingTag = openingTags.pop() as number;
 
-        if (openingTag && openingTags.length === 0) {
+        if (openingTags.length === 0) {
           const definition = template.slice(
             openingTag,
             index + '$endreplace'.length
@@ -211,12 +212,6 @@ export class Render {
               definition,
               parseLine(template, openingTag, this.line)
             )
-          );
-        } else {
-          throw new SyntaxError(
-            `Unexpected $endreplace tag found in '${
-              this.name
-            }' at line number ${parseLine(template, index, this.line)}`
           );
         }
       }

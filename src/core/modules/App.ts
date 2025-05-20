@@ -87,7 +87,7 @@ export type Middleware = (
 export function appKey(): string {
   if (!process.env.APP_KEY) {
     throw new AppError(
-      'Missing APP_KEY: execute "node cmd new:key" to generate a new APP_KEY'
+      'Missing APP_KEY: execute "node exec mk:env" to generate a new APP_KEY'
     );
   }
 

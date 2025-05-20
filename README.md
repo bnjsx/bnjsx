@@ -20,7 +20,10 @@ Bnjsx is a lightweight and flexible Node.js framework designed to provide a smoo
 
 ## Learning Bnjsx
 
-We are currently working on the documentation. Stay tuned for detailed guides, examples, and tutorials to help you get started with Bnjsx.
+The first version of the **Bnjsx documentation** is now live!
+Explore guides, examples, and tutorials to help you get started with the framework.
+
+👉 [Read the Docs on GitHub](https://github.com/bnjsx/docs)
 
 ## Contributing
 

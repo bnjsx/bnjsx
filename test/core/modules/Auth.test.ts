@@ -460,6 +460,7 @@ describe('Auth', () => {
         link: expect.stringContaining(
           `${req.protocol}://${req.host}:${req.port}/${auth.base}/`
         ),
+        token: expect.any(String),
       });
     });
   });

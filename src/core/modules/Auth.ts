@@ -581,7 +581,7 @@ export class Auth extends Controller {
     );
 
     const link = `${req.protocol}://${req.host}:${req.port}/${this.base}/${token}`;
-    const body = await render(this.component, { link });
+    const body = await render(this.component, { link, token });
     await this.mailer(req.body.email, this.subject, body);
   }
 

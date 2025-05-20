@@ -508,7 +508,7 @@ ServerResponse.prototype.render = function (
 };
 
 // @ts-ignore
-ServerResponse.prototype.json = function (data: unkown): Promise<void> {
+ServerResponse.prototype.json = function (data: unknown): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!isObj(data) && !isArr(data)) {
       return reject(new ResponseError('Invalid json data'));

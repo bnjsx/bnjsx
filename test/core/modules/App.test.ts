@@ -1483,7 +1483,7 @@ describe('appKey', () => {
     delete process.env.APP_KEY;
     expect(appKey).toThrow(AppError);
     expect(appKey).toThrow(
-      'Missing APP_KEY: execute "node cmd new:key" to generate a new APP_KEY'
+      'Missing APP_KEY: execute "node exec mk:env" to generate a new APP_KEY'
     );
   });
 });

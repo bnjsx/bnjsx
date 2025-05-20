@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@1.0.7 - 2025-05-19**
+
+### **Fixed**
+
+- **Nested `$render()` / `$replace()` Support**
+  - Fixed an issue where **nested `$render()` and `$replace()` calls would throw an error**:
+    > Unexpected `$replace` tag found in `watch.fx` at line 109
+  - You can now safely nest any number of `$render()` and `$replace()` calls within component templates.
+  - Example (now valid):
+    ```
+    $render('layout');
+      $replace('body');
+        $render('greeting');
+          $replace('name');
+            'simon';
+          $endreplace;
+        $endrender;
+      $endreplace;
+    $endrender;
+    ```
+
 ## **Bnjsx@1.0.6 - 2025-03-29**
 
 ### **Changed**
