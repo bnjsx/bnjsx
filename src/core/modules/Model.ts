@@ -329,7 +329,18 @@ class Selector extends Select {
       super
         .exec()
         .then((rows) => {
-          resolve(rows.map((row) => new this.model(modify(this.model, row))));
+          resolve(
+            rows.map((row) => {
+              const modified = modify(this.model, row);
+              const model = new this.model();
+
+              Object.keys(modified).forEach(
+                (key) => (model[key] = modified[key])
+              );
+
+              return model;
+            })
+          );
         })
         .catch(reject);
     });
@@ -341,6 +352,19 @@ class Selector extends Select {
    */
   public all(): Promise<Array<Model>> {
     return this.exec(); // Calls the private exec() method
+  }
+
+  /**
+   * Alias for `exec` that returns the same result but provides a more readable API.
+   * @returns A promise that resolves with an array of Model instances.
+   */
+  // @ts-ignore: Thanks for your help
+  public first(): Promise<Model> {
+    return new Promise((resolve, reject) => {
+      this.exec()
+        .then((r) => resolve(isArr(r) ? r[0] : r))
+        .catch(reject);
+    });
   }
 }
 

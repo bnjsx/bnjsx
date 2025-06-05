@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@1.0.8 - 2025-06-05**
+
+### Added
+
+- `Selector.first()` method to easily retrieve the first model instance from a query result.
+- Recommended for use with queries where the result is guaranteed to be unique (e.g., by `id`, `email`, or `slug`).
+
 ## **Bnjsx@1.0.7 - 2025-05-19**
 
 ### **Fixed**

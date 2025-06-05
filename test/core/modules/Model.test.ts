@@ -1023,6 +1023,27 @@ describe('Model', () => {
       expect(users[1]).toEqual(rows[1]);
     });
 
+    it('should select the first records', async () => {
+      // Mock the query execution to resolve with user data
+      const rows = [
+        { id: 1, email: 'user1@example.com' },
+        { id: 2, email: 'user2@example.com' },
+      ];
+      connection.query = jest.fn().mockResolvedValue(rows);
+
+      const user = await User.select().first(); // Execute the query using .first()
+
+      // Verify the query was executed
+      expect(connection.query).toHaveBeenCalledTimes(1);
+      expect(connection.query).toHaveBeenCalledWith(
+        'SELECT users.* FROM users;',
+        []
+      );
+
+      // Check that the result is single user
+      expect(user).toEqual(rows[0]);
+    });
+
     it('should select based on a condition', async () => {
       // Mock the query execution to resolve with filtered user data
       const rows = [
