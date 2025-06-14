@@ -2,6 +2,60 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@1.1.0 - 2025-06-14**
+
+### Added
+
+- New `builder.upsert()` method added alongside `insert`, `update`, `delete`, and `select` for powerful UPSERT (insert or update) operations.
+
+  ```ts
+  // If the username exists, update the age
+  // If it does not exist, insert the new row
+  builder
+    .upsert()
+    .from('users')
+    .row({ username: 'simon', age: 19 })
+    .conflict('username')
+    .set('age');
+
+  // If the username exists, do nothing
+  // If it does not exist, insert the new row
+  builder
+    .upsert()
+    .from('users')
+    .row({ username: 'simon', age: 19 })
+    .conflict('username');
+
+  // Bulk upsert: insert or update multiple rows by username
+  builder
+    .upsert()
+    .from('users')
+    .rows([
+      { username: 'simon', age: 19 },
+      { username: 'james', age: 44 },
+    ])
+    .conflict('username')
+    .set('age');
+  ```
+
+- `select()` method now accepts columns as arguments for simpler syntax:
+
+  ```ts
+  builder.select('username', 'email').from('users').limit(10).exec();
+  ```
+
+  This is in addition to the previous `.col()` method! use whichever you prefer.
+
+- New `.random()` method on the Select builder to order query results randomly, ideal for fetching random rows (e.g., random user, avatar, banner):
+
+  ```ts
+  builder.select().from('avatars').random().limit(1).first();
+  ```
+
+### Fixed
+
+- Improved `bugger()` error logging to use `error.constructor.name` for better error type display. Custom errors now show their proper class names (e.g., `QueryError`, `ConnectionError`) instead of the generic `Error`.
+
 ## **Bnjsx@1.0.8 - 2025-06-05**
 
 ### Added

@@ -111,6 +111,7 @@ export class Insert<
   public reset(): this {
     this.table = undefined;
     this.columns = undefined;
+    this.returnings = undefined;
 
     // inherted from Query
     this.values = new Array();

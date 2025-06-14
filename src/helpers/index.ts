@@ -142,7 +142,7 @@ export function bugger(error: Error): void {
     console.log(red('\n  ❌  ERROR OCCURRED'));
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`${red('  🔻  Message:')} ${error.message}`);
-    console.log(`${red('  🔻  Name:')} ${error.name}`);
+    console.log(`${red('  🔻  Name:')} ${error.constructor.name}`);
 
     if (error.stack) {
       console.log('\n' + red('  🔻  Stack Trace:'));

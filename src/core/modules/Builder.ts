@@ -8,6 +8,7 @@ import { Delete } from '../sql/Delete';
 
 import { PoolConnection } from './Pool';
 import { QueryResult, Row, Rows } from './Driver';
+import { Upsert } from '../sql/Upsert';
 
 /**
  * A Simple Yet Powerful Query Builder
@@ -107,11 +108,28 @@ export class Builder {
   }
 
   /**
+   * Creates an `Upsert` query builder to build and execute `UPSERT` queries.
+   *
+   * @returns An instance of the `Upsert` builder.
+   */
+  public upsert<
+    T extends number | string | void | Row | Rows =
+      | number
+      | string
+      | void
+      | Row
+      | Rows
+  >(): Upsert<T> {
+    return new Upsert<T>(this.connection);
+  }
+
+  /**
    * Creates a `Select` query builder to build and execute `SELECT` queries.
    *
    * @returns An instance of the `Select` builder.
    */
-  public select(): Select {
+  public select(...cols: string[]): Select {
+    if (cols.length) return new Select(this.connection).col(...cols);
     return new Select(this.connection);
   }
 

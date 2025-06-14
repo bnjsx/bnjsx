@@ -746,6 +746,60 @@ describe('Select', () => {
     });
   });
 
+  describe('random', () => {
+    let select;
+    let connection;
+
+    beforeEach(() => {
+      connection = mock.connection();
+      select = new Select(connection);
+    });
+
+    const testCases = [
+      {
+        driver: 'MySQL',
+        randomFn: 'RAND()',
+        expectedQuery: 'SELECT id FROM avatars ORDER BY RAND() LIMIT 1;',
+      },
+      {
+        driver: 'SQLite',
+        randomFn: 'RANDOM()',
+        expectedQuery: 'SELECT id FROM avatars ORDER BY RANDOM() LIMIT 1;',
+      },
+      {
+        driver: 'PostgreSQL',
+        randomFn: 'RANDOM()',
+        expectedQuery: 'SELECT id FROM avatars ORDER BY RANDOM() LIMIT 1;',
+      },
+    ];
+
+    testCases.forEach(({ driver, randomFn, expectedQuery }) => {
+      it(`should build correct random query for ${driver}`, async () => {
+        // Mock the connection's driver
+        connection.driver = { id: Symbol(driver) };
+
+        // Mock query result
+        const mockResponse = [{ id: 99 }];
+        jest.spyOn(connection, 'query').mockResolvedValue(mockResponse);
+
+        // Build and execute query
+        const result = await select
+          .col('id')
+          .from('avatars')
+          .random()
+          .limit(1)
+          .first();
+
+        // Validate the result
+        expect(result).toEqual({ id: 99 });
+
+        // Validate the built SQL and parameters
+        expect(connection.query).toHaveBeenCalledWith(expectedQuery, []);
+        expect(select.state.columns).toEqual(['id']);
+      });
+    });
+  });
+
   describe('paginate', () => {
     let select;
     let connection;

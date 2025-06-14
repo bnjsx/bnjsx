@@ -5,6 +5,7 @@ import {
   isFullStr,
   isFunc,
   isInt,
+  isMySQL,
   isUndefined,
 } from '../../helpers';
 import { Row, Rows } from '../modules/Driver';
@@ -87,7 +88,7 @@ type State = {
   /**
    * Sorting instructions for the query, each entry contains a `column` name and a `type` (e.g., 'ASC' or 'DESC').
    */
-  order: Array<{ column: string; type: string }>;
+  order: Array<{ column: string; type?: string }>;
 
   /**
    * Grouping columns for aggregate functions (e.g., `column1`).
@@ -280,7 +281,7 @@ export class Select extends Query<Rows> {
 
     if (this.state.order && this.state.order.length > 0) {
       const order = this.state.order
-        .map((o) => `${o.column} ${o.type}`)
+        .map((o) => `${o.column}${o.type ? ' ' + o.type : ''}`)
         .join(', ');
       statement += ` ORDER BY ${order}`;
     }
@@ -726,6 +727,20 @@ export class Select extends Query<Rows> {
           reject(e);
         });
     });
+  }
+
+  /**
+   * Orders the result randomly depending on the SQL driver (PostgreSQL, SQLite, MySQL).
+   * Can be chained before `.limit()` or `.first()` for random selection.
+   *
+   * @returns The `Select` query instance (`this`) for chaining.
+   */
+  public random(): this {
+    let fn = 'RANDOM()'; // Default for PostgreSQL and SQLite
+    if (isMySQL(this.connection.driver)) fn = 'RAND()';
+
+    this.state.order.push({ column: fn });
+    return this;
   }
 
   /**

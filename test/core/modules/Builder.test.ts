@@ -3,6 +3,7 @@ import { Insert } from '../../../src/core';
 import { Select } from '../../../src/core';
 import { Update } from '../../../src/core';
 import { Delete } from '../../../src/core';
+import { Upsert } from '../../../src/core/sql/Upsert';
 
 import { QueryError } from '../../../src/errors';
 
@@ -86,11 +87,29 @@ describe('Builder', () => {
     });
   });
 
+  describe('upsert', () => {
+    it('should return an Upsert builder instance', () => {
+      const builder = new Builder(connection);
+      const upsertBuilder = builder.upsert();
+      expect(upsertBuilder).toBeInstanceOf(Upsert);
+    });
+  });
+
   describe('select', () => {
     it('should return a Select builder instance', () => {
       const builder = new Builder(connection);
       const selectBuilder = builder.select();
       expect(selectBuilder).toBeInstanceOf(Select);
+    });
+
+    it('should be able to sepicify columns', () => {
+      const builder = new Builder(connection);
+      const query = builder
+        .select('username', 'email')
+        .from('users')
+        .limit(10)
+        .get.query();
+      expect(query).toBe('SELECT username, email FROM users LIMIT 10;');
     });
   });
 
