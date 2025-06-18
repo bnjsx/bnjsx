@@ -9,6 +9,7 @@ import {
   isMySQL,
   isPostgreSQL,
   isSQLite,
+  isArrOfStr,
 } from '../../helpers';
 
 import { Column } from '../schema/Column';
@@ -69,7 +70,8 @@ function resolve(
   columns: Array<Column>,
   builder: Builder,
   table: string,
-  constructor: string
+  constructor: string,
+  uniqueColumns: Array<string>
 ): Array<string> {
   const driver = builder.get.connection().driver;
   const statements: Array<string> = [];
@@ -198,6 +200,10 @@ function resolve(
     }
   }
 
+  if (uniqueColumns) {
+    constraints.push(`UNIQUE (${uniqueColumns.join(', ')})`);
+  }
+
   const cols = statements.join(', ');
   const cons = constraints.length > 0 ? `, ${constraints.join(', ')}` : '';
   const statement = `CREATE TABLE ${table} (${cols}${cons});`;
@@ -287,6 +293,8 @@ export abstract class Generator {
    * The builder instance used to execute database queries.
    */
   private builder: Builder;
+
+  private uniqueColumns: Array<string>;
 
   /**
    * Provides access to the table name and builder instance.
@@ -414,7 +422,8 @@ export abstract class Generator {
           columns,
           builder,
           this.get.table(),
-          this.constructor.name
+          this.constructor.name,
+          this.uniqueColumns
         );
 
         return execute(queries, builder).then(res).catch(rej);
@@ -471,6 +480,29 @@ export abstract class Generator {
   protected primaryKey(name?: string): Column {
     name = isFullStr(name) ? name : 'id';
     return this.column(name).pk();
+  }
+
+  /**
+   * Defines a composite unique constraint for the current model or schema.
+   *
+   * This method accepts one or more column names and stores them as a
+   * unique constraint. Typically used to prevent duplicate records with
+   * the same combination of values (e.g., `user_id` + `comment_id`).
+   *
+   * @param columns - One or more column names to be marked as unique.
+   * @throws `GeneratorError` If any value in `columns` is not a string.
+   *
+   * @example
+   * this.unique('user_id', 'comment_id');
+   */
+  protected unique(...columns: string[]): void {
+    if (!isArrOfStr(columns)) {
+      throw new GeneratorError(
+        `Invalid UNIQUE columns in: ${this.constructor.name}`
+      );
+    }
+
+    this.uniqueColumns = columns;
   }
 
   /**

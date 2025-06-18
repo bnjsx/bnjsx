@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@1.1.1 - 2025-06-18**
+
+### Added
+
+- **New `unique(...columns)` method** added to the Generator.
+  Use this to define **composite UNIQUE constraints** when generating tables — helpful for ensuring that a combination of columns (like `user_id` + `comment_id`) is unique, not just a single column.
+
+  ```ts
+  this.unique('user_id', 'comment_id');
+  ```
+
+  Useful in tables like `comment_reports`, where you want to prevent the same user from reporting the same comment multiple times.
+
 ## **Bnjsx@1.1.0 - 2025-06-14**
 
 ### Added

@@ -502,6 +502,29 @@ describe('Generator', () => {
             'CREATE TABLE test_table (email VARCHAR(200), CONSTRAINT unique_test_table_email UNIQUE (email));'
           );
         });
+
+        it('should add a composite UNIQUE constraint when specified', async () => {
+          const builder = generator.get.builder();
+          const comment_id = generator.column('comment_id').bigInt();
+          const user_id = generator.column('user_id').bigInt();
+          generator.unique('comment_id', 'user_id');
+
+          await expect(
+            generator.schema(comment_id, user_id)
+          ).resolves.toBeUndefined();
+
+          expect(builder.raw).toHaveBeenCalledTimes(1);
+          expect(builder.raw).toHaveBeenCalledWith(
+            'CREATE TABLE test_table (comment_id BIGINT, user_id BIGINT, UNIQUE (comment_id, user_id));'
+          );
+        });
+
+        it('should reject invalid columns', () => {
+          expect(() => generator.unique(null, undefined)).toThrow();
+          expect(() => generator.unique()).toThrow();
+          expect(() => generator.unique('user_id')).not.toThrow();
+          expect(() => generator.unique('comment_id')).not.toThrow();
+        });
       });
 
       describe('Check Constraints', () => {
