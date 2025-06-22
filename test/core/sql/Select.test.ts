@@ -1,4 +1,4 @@
-import { ASC, DESC, Select } from '../../../src/core';
+import { ASC, DESC, Seeder, Select } from '../../../src/core';
 import { ref } from '../../../src/core';
 
 const mock = {
@@ -548,6 +548,8 @@ describe('Select', () => {
       expect(select.build()).toBe(
         'SELECT * FROM users WHERE ((status = ? OR status = ?) AND city = ?);'
       );
+
+      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['inactive', 'banned', 'Tokyo']);
     });
 
@@ -599,6 +601,7 @@ describe('Select', () => {
           'SELECT * FROM users WHERE membership = ?;'
       );
 
+      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['gold', 'vip']);
     });
 
@@ -628,6 +631,7 @@ describe('Select', () => {
           'UNION ' +
           'SELECT * FROM users WHERE membership = ?;'
       );
+      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['gold', 'vip', 'platinum']);
     });
   });
@@ -648,6 +652,7 @@ describe('Select', () => {
           'UNION ALL ' +
           'SELECT * FROM users WHERE membership = ?;'
       );
+      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['gold', 'vip']);
     });
 
@@ -679,6 +684,8 @@ describe('Select', () => {
           'UNION ALL ' +
           'SELECT * FROM users WHERE membership = ?;'
       );
+      console.log(select.get.values(), select.get.query());
+
       expect(select.values).toEqual(['gold', 'vip', 'platinum']);
     });
   });
@@ -692,57 +699,84 @@ describe('Select', () => {
       select = new Select(connection);
     });
 
-    it('should resolve with count', async () => {
-      // Mock the database response for the query
+    it('should resolve with default count (*)', async () => {
       const mockResponse = [{ count: 5 }];
       jest.spyOn(connection, 'query').mockResolvedValue(mockResponse);
 
-      // Perform the query and get the count
       const count = await select
-        .col('name', 'age') // Ensure the columns are specified
+        .col('name', 'age')
         .from('users')
         .where((col) => col('status').equal('active'))
         .count();
 
-      // Verify the count returned is correct
       expect(count).toBe(5);
+
+      const builtQuery = select.build(true).replace(/;$/, '');
       expect(connection.query).toHaveBeenCalledWith(
-        'SELECT COUNT(*) AS count FROM users WHERE status = ?;',
+        `SELECT COUNT(*) AS count FROM (${builtQuery}) AS sub`,
         ['active']
       );
 
-      // Verify the state is preserved (columns remain intact)
       expect(select.state.columns).toEqual(['name', 'age']);
     });
 
-    it('should reject if there is an issue', async () => {
-      // Mock the database response for the query with an error
+    it('should count specific column', async () => {
+      const mockResponse = [{ count: 3 }];
+      jest.spyOn(connection, 'query').mockResolvedValue(mockResponse);
+
+      const count = await select
+        .col('id')
+        .from('users')
+        .count({ column: 'id' });
+
+      expect(count).toBe(3);
+
+      const builtQuery = select.build(true).replace(/;$/, '');
+      expect(connection.query).toHaveBeenCalledWith(
+        `SELECT COUNT(id) AS count FROM (${builtQuery}) AS sub`,
+        []
+      );
+    });
+
+    it('should count distinct column', async () => {
+      const mockResponse = [{ count: 2 }];
+      jest.spyOn(connection, 'query').mockResolvedValue(mockResponse);
+
+      const count = await select
+        .col('country')
+        .from('users')
+        .count({ column: 'country', distinct: true });
+
+      expect(count).toBe(2);
+
+      const builtQuery = select.build(true).replace(/;$/, '');
+      expect(connection.query).toHaveBeenCalledWith(
+        `SELECT COUNT(DISTINCT country) AS count FROM (${builtQuery}) AS sub`,
+        []
+      );
+    });
+
+    it('should reject on query failure', async () => {
       const mockError = new Error('Ops');
       jest.spyOn(connection, 'query').mockRejectedValue(mockError);
 
-      // Perform the query and get the count
-      select
-        .col('name', 'age')
-        .from('users')
-        .where((col) => col('status').equal('active'));
+      select.col('id').from('users');
 
-      await expect(select.count()).rejects.toThrow('Ops');
-
-      // Verify the query was made as expected
-      expect(connection.query).toHaveBeenCalledWith(
-        'SELECT COUNT(*) AS count FROM users WHERE status = ?;',
-        ['active']
-      );
-
-      // Verify the state is preserved
-      expect(select.state.columns).toEqual(['name', 'age']);
+      await expect(select.count({ column: 'id' })).rejects.toThrow('Ops');
     });
 
-    it('should reject if no table is specified', async () => {
-      // Try to call count without specifying a table
+    it('should throw if table is missing', async () => {
       await expect(select.count()).rejects.toThrow(
         'Invalid SELECT table: undefined'
       );
+    });
+
+    it('should throw on invalid count options', async () => {
+      await select.from('users');
+
+      await expect(
+        select.count({ column: 123 as any, distinct: 'true' as any })
+      ).rejects.toThrow('Invalid count options');
     });
   });
 

@@ -350,6 +350,11 @@ export class Condition {
   private column: string;
 
   /**
+   * Represents the main column involved in the condition.
+   */
+  public values: Array<string | number | null> = new Array();
+
+  /**
    * Constructs a `Condition` instance for the given query
    *
    * @param query The query instance associated with this condition.
@@ -435,7 +440,7 @@ export class Condition {
         throw new QueryError(`Invalid condition value: ${String(value)}`);
       }
 
-      this.query.values.push(value);
+      this.values.push(value);
     });
 
     this.stack.push(condition);
@@ -551,7 +556,7 @@ export class Condition {
     const placeholder = isRef ? date.column : '?';
 
     this.stack.push(`${not}${exDate(this.column)} = ${placeholder}`);
-    if (!isRef) this.query.values.push(date);
+    if (!isRef) this.values.push(date);
 
     this.negate = false;
     return this;
@@ -589,7 +594,7 @@ export class Condition {
     this.stack.push(
       `${not}${exTime(this.column, this.query.connection)} = ${placeholder}`
     );
-    if (!isRef) this.query.values.push(time);
+    if (!isRef) this.values.push(time);
 
     this.negate = false;
     return this;
@@ -627,7 +632,7 @@ export class Condition {
       `${not}${exYear(this.column, this.query.connection)} = ${placeholder}`
     );
 
-    if (!isRef) this.query.values.push(year);
+    if (!isRef) this.values.push(year);
 
     this.negate = false;
     return this;
@@ -664,7 +669,7 @@ export class Condition {
     this.stack.push(
       `${not}${exMonth(this.column, this.query.connection)} = ${placeholder}`
     );
-    if (!isRef) this.query.values.push(month);
+    if (!isRef) this.values.push(month);
 
     this.negate = false;
     return this;
@@ -702,7 +707,7 @@ export class Condition {
     this.stack.push(
       `${not}${exDay(this.column, this.query.connection)} = ${placeholder}`
     );
-    if (!isRef) this.query.values.push(day);
+    if (!isRef) this.values.push(day);
 
     this.negate = false;
     return this;
@@ -740,7 +745,7 @@ export class Condition {
     this.stack.push(
       `${not}${exHour(this.column, this.query.connection)} = ${placeholder}`
     );
-    if (!isRef) this.query.values.push(hour);
+    if (!isRef) this.values.push(hour);
 
     this.negate = false;
     return this;
@@ -778,7 +783,7 @@ export class Condition {
     this.stack.push(
       `${not}${exMinute(this.column, this.query.connection)} = ${placeholder}`
     );
-    if (!isRef) this.query.values.push(minute);
+    if (!isRef) this.values.push(minute);
 
     this.negate = false;
     return this;
@@ -816,7 +821,7 @@ export class Condition {
     this.stack.push(
       `${not}${exSecond(this.column, this.query.connection)} = ${placeholder}`
     );
-    if (!isRef) this.query.values.push(second);
+    if (!isRef) this.values.push(second);
 
     this.negate = false;
     return this;
@@ -844,7 +849,7 @@ export class Condition {
     const placeholder = isRef ? value.column : '?';
 
     this.stack.push(`${not}${this.column} = ${placeholder}`);
-    if (!isRef) this.query.values.push(value);
+    if (!isRef) this.values.push(value);
 
     this.negate = false;
     return this;
@@ -873,7 +878,7 @@ export class Condition {
     const placeholder = isRef ? value.column : '?';
 
     this.stack.push(`${not}${this.column} < ${placeholder}`);
-    if (!isRef) this.query.values.push(value);
+    if (!isRef) this.values.push(value);
 
     this.negate = false;
     return this;
@@ -901,7 +906,7 @@ export class Condition {
     const placeholder = isRef ? value.column : '?';
 
     this.stack.push(`${not}${this.column} <= ${placeholder}`);
-    if (!isRef) this.query.values.push(value);
+    if (!isRef) this.values.push(value);
 
     this.negate = false;
     return this;
@@ -929,7 +934,7 @@ export class Condition {
     const placeholder = isRef ? value.column : '?';
 
     this.stack.push(`${not}${this.column} > ${placeholder}`);
-    if (!isRef) this.query.values.push(value);
+    if (!isRef) this.values.push(value);
 
     this.negate = false;
     return this;
@@ -957,7 +962,7 @@ export class Condition {
     const placeholder = isRef ? value.column : '?';
 
     this.stack.push(`${not}${this.column} >= ${placeholder}`);
-    if (!isRef) this.query.values.push(value);
+    if (!isRef) this.values.push(value);
 
     this.negate = false;
     return this;
@@ -995,8 +1000,8 @@ export class Condition {
     const endHolder = isRefEnd ? end.column : '?';
     const condition = `${not}${this.column} BETWEEN ${startHolder} AND ${endHolder}`;
 
-    if (!isRefStart) this.query.values.push(start);
-    if (!isRefEnd) this.query.values.push(end);
+    if (!isRefStart) this.values.push(start);
+    if (!isRefEnd) this.values.push(end);
 
     this.stack.push(condition);
     this.negate = false;
@@ -1032,9 +1037,7 @@ export class Condition {
       .join(', ');
     const condition = `${not}${this.column} IN (${placeholders})`;
 
-    values.forEach((v) =>
-      v instanceof Ref ? null : this.query.values.push(v)
-    );
+    values.forEach((v) => (v instanceof Ref ? null : this.values.push(v)));
 
     this.stack.push(condition);
     this.negate = false;
@@ -1065,7 +1068,7 @@ export class Condition {
     const not = this.negate ? 'NOT ' : '';
     const condition = `${not}${this.column} IN (${select.build(true)})`;
 
-    this.query.values.push(...select.get.values());
+    this.values.push(...select.get.values());
     this.stack.push(condition);
     this.negate = false;
 
@@ -1099,7 +1102,7 @@ export class Condition {
     const placeholder = isRef ? value.column : '?';
     const condition = `${not}${this.column} LIKE ${placeholder}`;
 
-    if (!isRef) this.query.values.push(value);
+    if (!isRef) this.values.push(value);
     this.stack.push(condition);
     this.negate = false;
 
@@ -1146,7 +1149,7 @@ export class Condition {
     const not = this.negate ? 'NOT ' : '';
     const condition = `${not}EXISTS (${select.build(true)})`;
 
-    this.query.values.push(...select.get.values());
+    this.values.push(...select.get.values());
     this.stack.push(condition);
     this.negate = false;
 
@@ -1185,7 +1188,7 @@ export class Condition {
     const query = select.build(true);
     const condition = `${not}${this.column} ${sign} ANY (${query})`;
 
-    this.query.values.push(...select.get.values());
+    this.values.push(...select.get.values());
     this.stack.push(condition);
     this.negate = false;
 
@@ -1224,7 +1227,7 @@ export class Condition {
     const query = select.build(true);
     const condition = `${not}${this.column} ${sign} ALL (${query})`;
 
-    this.query.values.push(...select.get.values());
+    this.values.push(...select.get.values());
     this.stack.push(condition);
     this.negate = false;
 

@@ -70,6 +70,7 @@ export class Update extends Query<void> {
       .map((c, i) => (this.values[i] === null ? `${c} = NULL` : `${c} = ?`))
       .join(', ');
 
+    this.values.push(...this.state.condition.values);
     this.values = this.values.filter((v) => v !== null);
 
     return `UPDATE ${

@@ -368,13 +368,13 @@ describe('Condition', () => {
     test('should add a valid raw SQL condition with values', () => {
       condition.raw('age > ? AND status = ?', 18, 'active');
       expect(condition.stack).toContain('age > ? AND status = ?');
-      expect(condition.query.values).toEqual([18, 'active']);
+      expect(condition.values).toEqual([18, 'active']);
     });
 
     test('should add a valid raw SQL condition without values', () => {
       condition.raw('age > 18');
       expect(condition.stack).toContain('age > 18');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error if condition is not a string', () => {
@@ -392,12 +392,12 @@ describe('Condition', () => {
     test('should add condition when values array is empty', () => {
       condition.raw('age > ?');
       expect(condition.stack).toContain('age > ?');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should correctly add multiple valid values to the query values array', () => {
       condition.raw('age > ? AND name = ?', 25, 'John');
-      expect(condition.query.values).toEqual([25, 'John']);
+      expect(condition.values).toEqual([25, 'John']);
     });
   });
 
@@ -450,14 +450,14 @@ describe('Condition', () => {
       condition.column = 'created_at';
       condition.inDate('2023-05-01');
       expect(condition.stack).toContain('DATE(created_at) = ?');
-      expect(condition.query.values).toEqual(['2023-05-01']);
+      expect(condition.values).toEqual(['2023-05-01']);
     });
 
     test('should add a valid date comparison condition with a reference', () => {
       condition.column = 'created_at';
       condition.inDate(ref('orders.date'));
       expect(condition.stack).toContain('DATE(created_at) = orders.date');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for an invalid column', () => {
@@ -476,7 +476,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inDate('2023-05-01');
       expect(condition.stack).toContain('NOT DATE(created_at) = ?');
-      expect(condition.query.values).toEqual(['2023-05-01']);
+      expect(condition.values).toEqual(['2023-05-01']);
     });
   });
 
@@ -489,7 +489,7 @@ describe('Condition', () => {
 
       condition.inTime('15:30:00');
       expect(condition.stack).toContain('TIME(created_at) = ?');
-      expect(condition.query.values).toEqual(['15:30:00']);
+      expect(condition.values).toEqual(['15:30:00']);
     });
 
     test('should add a valid time comparison condition for PostgreSQL', () => {
@@ -502,7 +502,7 @@ describe('Condition', () => {
       expect(condition.stack).toContain(
         "TO_CHAR(created_at, 'HH24:MI:SS') = ?"
       );
-      expect(condition.query.values).toEqual(['15:30:00']);
+      expect(condition.values).toEqual(['15:30:00']);
     });
 
     test('should add a valid time comparison condition for SQLite', () => {
@@ -513,7 +513,7 @@ describe('Condition', () => {
 
       condition.inTime('15:30:00');
       expect(condition.stack).toContain("STRFTIME('%H:%M:%S', created_at) = ?");
-      expect(condition.query.values).toEqual(['15:30:00']);
+      expect(condition.values).toEqual(['15:30:00']);
     });
 
     test('should add a valid time comparison condition with a reference', () => {
@@ -524,7 +524,7 @@ describe('Condition', () => {
 
       condition.inTime(ref('orders.time'));
       expect(condition.stack).toContain('TIME(created_at) = orders.time');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for an invalid time', () => {
@@ -544,7 +544,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inTime('15:30:00');
       expect(condition.stack).toContain('NOT TIME(created_at) = ?');
-      expect(condition.query.values).toEqual(['15:30:00']);
+      expect(condition.values).toEqual(['15:30:00']);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -561,7 +561,7 @@ describe('Condition', () => {
 
       condition.inYear(2023);
       expect(condition.stack).toContain('YEAR(created_at) = ?');
-      expect(condition.query.values).toEqual([2023]);
+      expect(condition.values).toEqual([2023]);
     });
 
     test('should add a valid year comparison condition for PostgreSQL', () => {
@@ -572,7 +572,7 @@ describe('Condition', () => {
 
       condition.inYear(2023);
       expect(condition.stack).toContain('EXTRACT(YEAR FROM created_at) = ?');
-      expect(condition.query.values).toEqual([2023]);
+      expect(condition.values).toEqual([2023]);
     });
 
     test('should add a valid year comparison condition for SQLite', () => {
@@ -583,7 +583,7 @@ describe('Condition', () => {
 
       condition.inYear(2023);
       expect(condition.stack).toContain("STRFTIME('%Y', created_at) = ?");
-      expect(condition.query.values).toEqual([2023]);
+      expect(condition.values).toEqual([2023]);
     });
 
     test('should add a valid year comparison condition with a reference', () => {
@@ -594,7 +594,7 @@ describe('Condition', () => {
 
       condition.inYear(ref('orders.year'));
       expect(condition.stack).toContain('YEAR(created_at) = orders.year');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for invalid year format', () => {
@@ -622,7 +622,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inYear(2023);
       expect(condition.stack).toContain('NOT YEAR(created_at) = ?');
-      expect(condition.query.values).toEqual([2023]);
+      expect(condition.values).toEqual([2023]);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -639,7 +639,7 @@ describe('Condition', () => {
 
       condition.inMonth(5); // May
       expect(condition.stack).toContain('MONTH(created_at) = ?');
-      expect(condition.query.values).toEqual([5]);
+      expect(condition.values).toEqual([5]);
     });
 
     test('should add a valid month comparison condition for PostgreSQL', () => {
@@ -650,7 +650,7 @@ describe('Condition', () => {
 
       condition.inMonth(5); // May
       expect(condition.stack).toContain('EXTRACT(MONTH FROM created_at) = ?');
-      expect(condition.query.values).toEqual([5]);
+      expect(condition.values).toEqual([5]);
     });
 
     test('should add a valid month comparison condition for SQLite', () => {
@@ -661,7 +661,7 @@ describe('Condition', () => {
 
       condition.inMonth(5); // May
       expect(condition.stack).toContain("STRFTIME('%m', created_at) = ?");
-      expect(condition.query.values).toEqual([5]);
+      expect(condition.values).toEqual([5]);
     });
 
     test('should add a valid month comparison condition with a reference', () => {
@@ -672,7 +672,7 @@ describe('Condition', () => {
 
       condition.inMonth(ref('orders.month')); // May
       expect(condition.stack).toContain('MONTH(created_at) = orders.month');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for invalid month value', () => {
@@ -700,7 +700,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inMonth(5);
       expect(condition.stack).toContain('NOT MONTH(created_at) = ?');
-      expect(condition.query.values).toEqual([5]);
+      expect(condition.values).toEqual([5]);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -717,7 +717,7 @@ describe('Condition', () => {
 
       condition.inDay(15); // 15th day of the month
       expect(condition.stack).toContain('DAY(created_at) = ?');
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should add a valid day comparison condition for PostgreSQL', () => {
@@ -728,7 +728,7 @@ describe('Condition', () => {
 
       condition.inDay(15); // 15th day of the month
       expect(condition.stack).toContain('EXTRACT(DAY FROM created_at) = ?');
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should add a valid day comparison condition for SQLite', () => {
@@ -739,7 +739,7 @@ describe('Condition', () => {
 
       condition.inDay(15); // 15th day of the month
       expect(condition.stack).toContain("STRFTIME('%d', created_at) = ?");
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should add a valid day comparison condition with a reference', () => {
@@ -750,7 +750,7 @@ describe('Condition', () => {
 
       condition.inDay(ref('orders.day')); // May
       expect(condition.stack).toContain('DAY(created_at) = orders.day');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for invalid day value', () => {
@@ -776,7 +776,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inDay(15);
       expect(condition.stack).toContain('NOT DAY(created_at) = ?');
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -792,7 +792,7 @@ describe('Condition', () => {
       condition.inHour(12);
 
       expect(condition.stack).toContain('HOUR(created_at) = ?');
-      expect(condition.query.values).toEqual([12]);
+      expect(condition.values).toEqual([12]);
     });
 
     test('should add a valid hour comparison condition for PostgreSQL', () => {
@@ -802,7 +802,7 @@ describe('Condition', () => {
       condition.inHour(12);
 
       expect(condition.stack).toContain('EXTRACT(HOUR FROM created_at) = ?');
-      expect(condition.query.values).toEqual([12]);
+      expect(condition.values).toEqual([12]);
     });
 
     test('should add a valid hour comparison condition for SQLite', () => {
@@ -812,7 +812,7 @@ describe('Condition', () => {
       condition.inHour(12);
 
       expect(condition.stack).toContain("STRFTIME('%H', created_at) = ?");
-      expect(condition.query.values).toEqual([12]);
+      expect(condition.values).toEqual([12]);
     });
 
     test('should add a valid hour comparison condition with a reference', () => {
@@ -822,7 +822,7 @@ describe('Condition', () => {
       condition.inHour(ref('orders.hour'));
 
       expect(condition.stack).toContain('HOUR(created_at) = orders.hour');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for invalid hour value', () => {
@@ -850,7 +850,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inHour(15);
       expect(condition.stack).toContain('NOT HOUR(created_at) = ?');
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -866,7 +866,7 @@ describe('Condition', () => {
       condition.inMinute(34);
 
       expect(condition.stack).toContain('MINUTE(created_at) = ?');
-      expect(condition.query.values).toEqual([34]);
+      expect(condition.values).toEqual([34]);
     });
 
     test('should add a valid minute comparison condition for PostgreSQL', () => {
@@ -876,7 +876,7 @@ describe('Condition', () => {
       condition.inMinute(34);
 
       expect(condition.stack).toContain('EXTRACT(MINUTE FROM created_at) = ?');
-      expect(condition.query.values).toEqual([34]);
+      expect(condition.values).toEqual([34]);
     });
 
     test('should add a valid minute comparison condition for SQLite', () => {
@@ -886,7 +886,7 @@ describe('Condition', () => {
       condition.inMinute(34);
 
       expect(condition.stack).toContain("STRFTIME('%M', created_at) = ?");
-      expect(condition.query.values).toEqual([34]);
+      expect(condition.values).toEqual([34]);
     });
 
     test('should add a valid minute comparison condition with a reference', () => {
@@ -897,7 +897,7 @@ describe('Condition', () => {
       condition.inMinute(ref('orders.minute'));
 
       expect(condition.stack).toContain('MINUTE(created_at) = orders.minute');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for invalid minute value', () => {
@@ -925,7 +925,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inMinute(15);
       expect(condition.stack).toContain('NOT MINUTE(created_at) = ?');
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -941,7 +941,7 @@ describe('Condition', () => {
       condition.inSecond(56);
 
       expect(condition.stack).toContain('SECOND(created_at) = ?');
-      expect(condition.query.values).toEqual([56]);
+      expect(condition.values).toEqual([56]);
     });
 
     test('should add a valid second comparison condition for PostgreSQL', () => {
@@ -951,7 +951,7 @@ describe('Condition', () => {
       condition.inSecond(56);
 
       expect(condition.stack).toContain('EXTRACT(SECOND FROM created_at) = ?');
-      expect(condition.query.values).toEqual([56]);
+      expect(condition.values).toEqual([56]);
     });
 
     test('should add a valid second comparison condition for SQLite', () => {
@@ -961,7 +961,7 @@ describe('Condition', () => {
       condition.inSecond(56);
 
       expect(condition.stack).toContain("STRFTIME('%S', created_at) = ?");
-      expect(condition.query.values).toEqual([56]);
+      expect(condition.values).toEqual([56]);
     });
 
     test('should add a valid second comparison condition with a reference', () => {
@@ -972,7 +972,7 @@ describe('Condition', () => {
       condition.inSecond(ref('orders.second'));
 
       expect(condition.stack).toContain('SECOND(created_at) = orders.second');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     test('should throw an error for invalid second value', () => {
@@ -1000,7 +1000,7 @@ describe('Condition', () => {
       condition.negate = true;
       condition.inSecond(15);
       expect(condition.stack).toContain('NOT SECOND(created_at) = ?');
-      expect(condition.query.values).toEqual([15]);
+      expect(condition.values).toEqual([15]);
     });
 
     test('should throw an error for invalid column name', () => {
@@ -1012,7 +1012,7 @@ describe('Condition', () => {
     it('should generate the correct equality condition for numbers', () => {
       const query = condition.col('age').equal(30).build();
       expect(query).toBe('age = ?');
-      expect(condition.query.values).toEqual([30]);
+      expect(condition.values).toEqual([30]);
     });
 
     it('should generate the correct equality condition with a reference', () => {
@@ -1021,7 +1021,7 @@ describe('Condition', () => {
         .equal(ref('profiles.user_id'))
         .build();
       expect(query).toBe('users.id = profiles.user_id');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should generate the correct equality condition for strings', () => {
@@ -1049,7 +1049,7 @@ describe('Condition', () => {
     it('should generate the correct less-than condition for numbers', () => {
       const query = condition.col('price').lessThan(100).build();
       expect(query).toBe('price < ?');
-      expect(condition.query.values).toEqual([100]);
+      expect(condition.values).toEqual([100]);
     });
 
     it('should generate the correct less-than condition for date strings', () => {
@@ -1063,7 +1063,7 @@ describe('Condition', () => {
         .lessThan(ref('table.column'))
         .build();
       expect(query).toBe('price < table.column');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should throw an error for invalid value type', () => {
@@ -1087,7 +1087,7 @@ describe('Condition', () => {
       expect(condition.col('stock').lessThanOrEqual(50).build()).toBe(
         'stock <= ?'
       );
-      expect(condition.query.values).toEqual([50]);
+      expect(condition.values).toEqual([50]);
     });
 
     it('should generate the correct less-than-or-equal condition for date strings', () => {
@@ -1100,7 +1100,7 @@ describe('Condition', () => {
       expect(
         condition.col('stock').lessThanOrEqual(ref('table.column')).build()
       ).toBe('stock <= table.column');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should throw an error for invalid value type', () => {
@@ -1124,7 +1124,7 @@ describe('Condition', () => {
       expect(condition.col('salary').greaterThan(50000).build()).toBe(
         'salary > ?'
       );
-      expect(condition.query.values).toEqual([50000]);
+      expect(condition.values).toEqual([50000]);
     });
 
     it('should generate the correct greater-than condition for date strings', () => {
@@ -1137,7 +1137,7 @@ describe('Condition', () => {
       expect(
         condition.col('salary').greaterThan(ref('table.column')).build()
       ).toBe('salary > table.column');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should throw an error for invalid value type', () => {
@@ -1162,7 +1162,7 @@ describe('Condition', () => {
         'age >= ?'
       );
 
-      expect(condition.query.values).toEqual([18]);
+      expect(condition.values).toEqual([18]);
     });
 
     it('should generate the correct greater-than-or-equal condition for date strings', () => {
@@ -1176,7 +1176,7 @@ describe('Condition', () => {
         condition.col('age').greaterThanOrEqual(ref('table.column')).build()
       ).toBe('age >= table.column');
 
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should throw an error for invalid value type', () => {
@@ -1201,7 +1201,7 @@ describe('Condition', () => {
     it('should generate the correct BETWEEN condition for numbers', () => {
       const query = condition.col('price').between(100, 200).build();
       expect(query).toBe('price BETWEEN ? AND ?');
-      expect(condition.query.values).toEqual([100, 200]);
+      expect(condition.values).toEqual([100, 200]);
     });
 
     it('should generate the correct BETWEEN condition for string values', () => {
@@ -1210,7 +1210,7 @@ describe('Condition', () => {
         .between('2023-01-01', '2023-12-31')
         .build();
       expect(query).toBe('created_at BETWEEN ? AND ?');
-      expect(condition.query.values).toEqual(['2023-01-01', '2023-12-31']);
+      expect(condition.values).toEqual(['2023-01-01', '2023-12-31']);
     });
 
     it('should generate the correct BETWEEN condition with a reference', () => {
@@ -1219,7 +1219,7 @@ describe('Condition', () => {
         .between(ref('table.column'), ref('table.column'))
         .build();
       expect(query).toBe('price BETWEEN table.column AND table.column');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should throw an error if the start value is invalid', () => {
@@ -1252,7 +1252,7 @@ describe('Condition', () => {
     it('should generate the correct IN condition for numbers', () => {
       const query = condition.col('id').in(1, 2, 3).build();
       expect(query).toBe('id IN (?, ?, ?)');
-      expect(condition.query.values).toEqual([1, 2, 3]);
+      expect(condition.values).toEqual([1, 2, 3]);
     });
 
     it('should generate the correct IN condition for strings', () => {
@@ -1261,13 +1261,13 @@ describe('Condition', () => {
         .in('active', 'pending', 'inactive')
         .build();
       expect(query).toBe('status IN (?, ?, ?)');
-      expect(condition.query.values).toEqual(['active', 'pending', 'inactive']);
+      expect(condition.values).toEqual(['active', 'pending', 'inactive']);
     });
 
     it('should generate the correct IN condition with a reference', () => {
       const query = condition.col('id').in(ref('table.column'), 2, 3).build();
       expect(query).toBe('id IN (table.column, ?, ?)');
-      expect(condition.query.values).toEqual([2, 3]);
+      expect(condition.values).toEqual([2, 3]);
     });
 
     it('should throw an error if the values array is empty', () => {
@@ -1307,7 +1307,7 @@ describe('Condition', () => {
 
       const query = condition.col('user_id').inSubquery(subquery).build();
       expect(query).toBe('user_id IN (SELECT id FROM users WHERE status = ?)');
-      expect(condition.query.values).toEqual(['active']);
+      expect(condition.values).toEqual(['active']);
     });
 
     it('should throw an error if the subquery is not a function', () => {
@@ -1343,13 +1343,13 @@ describe('Condition', () => {
     it('should generate the correct LIKE condition', () => {
       const query = condition.col('name').like('%John%').build();
       expect(query).toBe('name LIKE ?');
-      expect(condition.query.values).toEqual(['%John%']);
+      expect(condition.values).toEqual(['%John%']);
     });
 
     it('should generate the correct LIKE condition with a reference', () => {
       const query = condition.col('name').like(ref('table.column')).build();
       expect(query).toBe('name LIKE table.column');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should throw an error if the value is not a non-empty string', () => {
@@ -1378,7 +1378,7 @@ describe('Condition', () => {
     it('should generate the correct IS NULL condition', () => {
       const query = condition.col('email').isNull().build();
       expect(query).toBe('email IS NULL');
-      expect(condition.query.values).toEqual([]); // No values for IS NULL
+      expect(condition.values).toEqual([]); // No values for IS NULL
     });
 
     it('should handle the NOT condition when negated', () => {
@@ -1401,7 +1401,7 @@ describe('Condition', () => {
 
       const query = condition.col('user_id').exists(subquery).build();
       expect(query).toBe('EXISTS (SELECT * FROM users WHERE status = ?)');
-      expect(condition.query.values).toEqual(['active']);
+      expect(condition.values).toEqual(['active']);
     });
 
     it('should handle the NOT EXISTS condition when negated', () => {
@@ -1411,7 +1411,7 @@ describe('Condition', () => {
 
       const query = condition.col('user_id').not().exists(subquery).build();
       expect(query).toBe('NOT EXISTS (SELECT * FROM users WHERE status = ?)');
-      expect(condition.query.values).toEqual(['inactive']);
+      expect(condition.values).toEqual(['inactive']);
     });
 
     it('should throw an error if the subquery is not a function', () => {
@@ -1429,7 +1429,7 @@ describe('Condition', () => {
 
       const query = condition.col('age').any(MORE, subquery).build();
       expect(query).toBe('age > ANY (SELECT age FROM users)');
-      expect(condition.query.values).toEqual([]);
+      expect(condition.values).toEqual([]);
     });
 
     it('should handle the NOT ANY condition when negated', () => {
@@ -1486,7 +1486,7 @@ describe('Condition', () => {
           .build()
       ).toBe('status = ? AND name = ANY (SELECT name FROM users WHERE id = ?)');
 
-      expect(condition.query.values).toEqual(['active', 1]);
+      expect(condition.values).toEqual(['active', 1]);
     });
   });
 

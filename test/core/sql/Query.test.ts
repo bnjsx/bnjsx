@@ -21,22 +21,7 @@ describe('Query', () => {
   });
 
   describe('log.query', () => {
-    it('should log the query if defined', async () => {
-      // Mock console.log
-      console.log = jest.fn();
-
-      // Defined query
-      select.query = 'SELECT * FROM users;';
-      expect(select.query).not.toBeUndefined();
-
-      // Log the query
-      expect(select.log.query()).toBe(select);
-
-      // Defined query => log
-      expect(console.log).toHaveBeenCalledWith('SELECT * FROM users;');
-    });
-
-    it('should build the query if undefined', async () => {
+    it('should build the query', async () => {
       // Mock console.log
       console.log = jest.fn();
 
@@ -68,17 +53,7 @@ describe('Query', () => {
   });
 
   describe('get.query', () => {
-    it('should get the query if defined', async () => {
-      // Defined query
-      select.query = 'SELECT * FROM users;';
-      expect(select.query).not.toBeUndefined();
-
-      // Defined query => get
-      expect(select.get.query()).toBe('SELECT * FROM users;');
-    });
-
-    it('should build the query if undefined', async () => {
-      // Undefined query
+    it('should build the query', async () => {
       select.from('users');
       expect(select.query).toBeUndefined();
 

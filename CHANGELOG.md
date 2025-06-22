@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@1.1.2 - 2025-06-22**
+
+### Fixed
+
+- **Query values binding issue resolved**  
+  You can now build your queries **in any order**, conditionally or dynamically — even if the execution order is messy — the query builder will **always bind values in the correct order**.
+
+### Improved
+
+- **`Select.count()` now supports `{ column, distinct }` options**  
+  You can now specify which column to count, and whether to count distinct values:
+  ```ts
+  select.count({ column: 'user_id', distinct: true });
+  ```
+
+* **`Select.paginate()` now accepts the same options**
+  Just pass `{ column, distinct }` to `paginate()` and we’ll use them when calculating the total count:
+
+  ```ts
+  select.paginate(1, 20, { column: 'movies.id', distinct: true });
+  ```
+
 ## **Bnjsx@1.1.1 - 2025-06-18**
 
 ### Added

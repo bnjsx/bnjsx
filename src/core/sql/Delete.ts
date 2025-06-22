@@ -92,6 +92,7 @@ export class Delete extends Query<void> {
       throw new QueryError(`DELETE condition is required`);
     }
 
+    this.values = this.condition.values;
     return `DELETE FROM ${this.table} WHERE ${this.condition.build()};`;
   }
 

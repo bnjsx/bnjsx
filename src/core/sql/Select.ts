@@ -6,6 +6,7 @@ import {
   isFunc,
   isInt,
   isMySQL,
+  isStr,
   isUndefined,
 } from '../../helpers';
 import { Row, Rows } from '../modules/Driver';
@@ -69,6 +70,11 @@ export interface Pagination<R> {
 }
 
 /**
+ * Represents options for customizing the `count()` and `paginate()` methods.
+ */
+type CountOptions = { column?: string; distinct?: boolean };
+
+/**
  * Represents the internal state of a SELECT query, holding the settings and clauses used to build the SQL query.
  *
  * This type includes all the components necessary for constructing a SELECT query, such as the table name,
@@ -127,7 +133,11 @@ type State = {
   /**
    * Defines `UNION` or `UNION ALL` clauses to combine multiple queries. Each entry has a `query` and an `all` flag.
    */
-  unions: Array<{ query: string; all: boolean }>;
+  unions: Array<{
+    query: string;
+    all: boolean;
+    values: Array<string | number | null>;
+  }>;
 
   /**
    * The offset for paginating results (skipping a number of rows).
@@ -249,6 +259,7 @@ export class Select extends Query<Rows> {
       throw new QueryError(`Invalid SELECT table: ${String(this.state.table)}`);
     }
 
+    this.values = [];
     subquery = isBool(subquery) ? subquery : false;
 
     const columns = Array.isArray(this.state.columns)
@@ -261,6 +272,7 @@ export class Select extends Query<Rows> {
     if (this.state.joins.length > 0) {
       const joins = this.state.joins
         .map((join) => {
+          this.values.push(...join.condition.values);
           return `${join.type} JOIN ${join.table} ON ${join.condition.build()}`;
         })
         .join(' ');
@@ -268,6 +280,7 @@ export class Select extends Query<Rows> {
     }
 
     if (this.state.where) {
+      this.values.push(...this.state.where.values);
       statement += ` WHERE ${this.state.where.build()}`;
     }
 
@@ -276,6 +289,7 @@ export class Select extends Query<Rows> {
     }
 
     if (this.state.having) {
+      this.values.push(...this.state.having.values);
       statement += ` HAVING ${this.state.having.build()}`;
     }
 
@@ -296,7 +310,10 @@ export class Select extends Query<Rows> {
 
     if (this.state.unions.length > 0) {
       statement += ` ${this.state.unions
-        .map((union) => `${union.all ? 'UNION ALL' : 'UNION'} ${union.query}`)
+        .map((union) => {
+          this.values.push(...union.values);
+          return `${union.all ? 'UNION ALL' : 'UNION'} ${union.query}`;
+        })
         .join(' ')}`;
     }
 
@@ -660,9 +677,8 @@ export class Select extends Query<Rows> {
     this.state.unions.push({
       query: select.build(true),
       all: false,
+      values: select.get.values(),
     });
-
-    this.values.push(...select.get.values());
 
     return this;
   }
@@ -689,44 +705,10 @@ export class Select extends Query<Rows> {
     this.state.unions.push({
       query: select.build(true),
       all: true,
+      values: select.get.values(),
     });
-
-    this.values.push(...select.get.values());
 
     return this;
-  }
-
-  /**
-   * Returns the total number of rows that match the current query conditions.
-   *
-   * This method allows you to easily get a count of items in the table based on any filters or conditions
-   * applied to the query.
-   *
-   * @returns A promise that resolves to the count of matching rows.
-   *
-   */
-  public count(): Promise<number> {
-    return new Promise<number>((resolve, reject) => {
-      if (!isFullStr(this.state.table)) {
-        throw new QueryError(
-          `Invalid SELECT table: ${String(this.state.table)}`
-        );
-      }
-
-      const columns = this.state.columns;
-      this.state.columns = ['COUNT(*) AS count'];
-
-      this.connection
-        .query(this.get.query(), this.get.values())
-        .then((r) => {
-          this.state.columns = columns;
-          resolve(r[0].count);
-        })
-        .catch((e) => {
-          this.state.columns = columns;
-          reject(e);
-        });
-    });
   }
 
   /**
@@ -744,45 +726,100 @@ export class Select extends Query<Rows> {
   }
 
   /**
-   * Paginates the query results and returns a specific page of items, along with pagination details.
+   * Returns the total number of rows that match the current query conditions.
    *
-   * This method is useful for breaking down large result sets into smaller, paginated chunks.
+   * This method wraps the current query inside a subquery and applies a `COUNT(column)` or
+   * `COUNT(DISTINCT column)` on it, which supports complex filters, joins, and groupings.
    *
-   * @param page page The page number to retrieve (starting from 1).
-   * @param items The number of items per page (default is 10).
-   * @returns A promise that resolves to an object
+   * @param options Optional settings for the count operation.
+   * @param options.column The column to count. Defaults to '*'.
+   * @param options.distinct Whether to count only distinct values. Defaults to false.
    *
-   * @notes
-   *   - Use `next` and `prev` to determine if you should show or hide the `Next` and `Previous` buttons in your UI.
-   *     - If `next` is `undefined`, hide the `Next` button (last page).
-   *     - If `prev` is `undefined`, hide the `Previous` button (first page).
-   *   - Use `total.pages` and `total.items` to show total pages and items to users.
-   *   - You can also use this method to implement infinite scrolling.
+   * @returns A promise that resolves to the total number of matching rows.
+   *
+   * @throws `QueryError` If no valid table is set or if invalid options are provided.
    */
-  public paginate(page: number, items: number = 10): Promise<Pagination<Row>> {
+  public count(
+    options: { column?: string; distinct?: boolean } = {}
+  ): Promise<number> {
+    return new Promise((resolve, reject) => {
+      if (!isFullStr(this.state.table)) {
+        throw new QueryError(
+          `Invalid SELECT table: ${String(this.state.table)}`
+        );
+      }
+
+      if (
+        ('column' in options && !isStr(options.column)) ||
+        ('distinct' in options && !isBool(options.distinct))
+      ) {
+        throw new QueryError(
+          `Invalid count options: ${JSON.stringify(options)}`
+        );
+      }
+
+      const subQuery = this.build(true);
+      const values = this.get.values();
+
+      const column = options.column || '*';
+      const countColumn = options.distinct ? `DISTINCT ${column}` : column;
+
+      const query = `SELECT COUNT(${countColumn}) AS count FROM (${subQuery}) AS sub`;
+
+      this.connection
+        .query(query, values)
+        .then((r) => resolve(r[0].count))
+        .catch(reject);
+    });
+  }
+
+  /**
+   * Paginates the query results and returns a page of items along with pagination metadata.
+   *
+   * This method is ideal for breaking down large result sets into pages or implementing
+   * infinite scroll. It uses a subquery for counting total rows safely.
+   *
+   * @param page The page number to retrieve (starting from 1).
+   * @param items The number of items per page (default: 10).
+   * @param options Optional count configuration (column + distinct).
+   *
+   * @returns A promise that resolves to a pagination object containing:
+   * - `result`: The current page of query results.
+   * - `page`: Info like current, next, prev page numbers.
+   * - `total`: Info like total pages and total item count.
+   *
+   * @throws {QueryError} If the query is malformed or pagination fails.
+   *
+   * @example
+   * await query.paginate(1, 20, { column: 'animes.id', distinct: true });
+   */
+  public paginate(
+    page: number,
+    items: number = 10,
+    options?: CountOptions
+  ): Promise<Pagination<Row>> {
     return new Promise((resolve, reject) => {
       if (!isInt(page) || page < 1) page = 1;
       if (!isInt(items) || items < 1) items = 10;
 
-      this.count()
+      this.count(options)
         .then((count) => {
           const offset = (page - 1) * items;
           this.limit(items).offset(offset);
 
           this.exec()
             .then((result) => {
-              const total = count;
-              const totalPages = Math.ceil(total / items);
+              const totalPages = Math.ceil(count / items);
 
               resolve({
                 result,
                 page: {
                   current: page,
-                  prev: page - 1 === 0 ? undefined : page - 1,
+                  prev: page > 1 ? page - 1 : undefined,
                   next: page < totalPages ? page + 1 : undefined,
                   items,
                 },
-                total: { pages: totalPages, items: total },
+                total: { pages: totalPages, items: count },
               });
             })
             .catch(reject);

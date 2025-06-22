@@ -70,7 +70,7 @@ export abstract class Query<T> {
    * Logger for the current query, providing methods to log query details.
    */
   public log: Logger<T> = {
-    query: () => (console.log(this.query ? this.query : this.build()), this),
+    query: () => (console.log(this.build()), this),
     values: () => (console.log(this.values), this),
   };
 
@@ -78,7 +78,7 @@ export abstract class Query<T> {
    * Getter for retrieving query parameters including the SQL string, values, and connection.
    */
   public get: Getter = {
-    query: (): string => (this.query ? this.query : this.build()),
+    query: (): string => this.build(),
     values: (): Array<string | number> => this.values,
   };
 
