@@ -6,6 +6,7 @@ import { config } from '../../../src/config';
 (config as jest.Mock).mockReturnValue({
   resolveSync: jest.fn().mockReturnValue('root'),
   loadSync: jest.fn().mockReturnValue({
+    env: 'dev',
     cache: false,
     paths: {
       views: 'views',
@@ -54,6 +55,16 @@ import {
 import * as fs from 'fs/promises';
 
 describe('render', () => {
+  beforeEach(() => {
+    // Ignore warn() logs
+    console.log = jest.fn();
+  });
+
+  afterAll(() => {
+    // Reset
+    jest.resetAllMocks();
+  });
+
   describe('Caching', () => {
     beforeAll(() => {
       // Enable caching
@@ -206,32 +217,28 @@ describe('render', () => {
       await expect(render('foo')).rejects.toThrow(Error);
     });
 
-    it('Should reject if you access a value on undefined', async () => {
+    it('Should resolve if you access a value on undefined', async () => {
       jest.spyOn(fs, 'readFile').mockResolvedValue(`$(foo.bar)`);
-      await expect(render('foo', { foo: undefined })).rejects.toThrow(
-        ComponentError
+      await expect(render('foo', { foo: undefined })).resolves.toBe(
+        'undefined'
       );
     });
 
-    it('Should reject if you access a value on null', async () => {
+    it('Should resolve if you access a value on null', async () => {
       jest.spyOn(fs, 'readFile').mockResolvedValue(`$(foo.bar)`);
-      await expect(render('foo', { foo: null })).rejects.toThrow(
-        ComponentError
+      await expect(render('foo', { foo: null })).resolves.toBe('null');
+    });
+
+    it('Should resolve if you access an index on undefined', async () => {
+      jest.spyOn(fs, 'readFile').mockResolvedValue(`$(foo[0])`);
+      await expect(render('foo', { foo: undefined })).resolves.toBe(
+        'undefined'
       );
     });
 
-    it('Should reject if you access an index on undefined', async () => {
+    it('Should resolve if you access an index on null', async () => {
       jest.spyOn(fs, 'readFile').mockResolvedValue(`$(foo[0])`);
-      await expect(render('foo', { foo: undefined })).rejects.toThrow(
-        ComponentError
-      );
-    });
-
-    it('Should reject if you access an index on null', async () => {
-      jest.spyOn(fs, 'readFile').mockResolvedValue(`$(foo[0])`);
-      await expect(render('foo', { foo: null })).rejects.toThrow(
-        ComponentError
-      );
+      await expect(render('foo', { foo: null })).resolves.toBe('null');
     });
 
     it('Should reject if you access an undefined global', async () => {

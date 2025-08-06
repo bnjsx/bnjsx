@@ -3,6 +3,7 @@ import { Row } from '../modules/Driver';
 import { Col, Con, Condition } from './Condition';
 import { Query } from './Query';
 import {
+  isBool,
   isChildOf,
   isFullArr,
   isFullStr,
@@ -83,16 +84,21 @@ export class Update extends Query<void> {
    *
    * @param row An object with keys as column names and their corresponding new values.
    * @returns The `Update` query instance (`this`) to allow method chaining.
-   * @throws `QueryError` if the provided row is not an object, or column names and values are invalid.
+   * @throws `QueryError` if the provided row is not an object, or if any column name or value is invalid.
    *
    * @notes
-   * - The keys in the `row` object represent column names (e.g. `first_name` `last_name`).
-   * - The values in the `row` object represent the update values and must be either `string` or `number` or `null`.
-   * - All values can be represented using `strings` and `numbers` and `null`:
-   *   - Boolean: use `1` for true and `0` for false
-   *   - Null: use `null`
-   *   - JSON: use `JSON.stringify(object)` for objects
-   *   - Dates: use date strings formatted as `'YYYY-MM-DD hh:mm:ss'`
+   * - The keys in the `row` object represent column names (e.g. `first_name`, `last_name`).
+   * - The values in the `row` object must be one of the supported types:
+   *   - `string`
+   *   - `number`
+   *   - `boolean`
+   *   - `null`
+   *
+   * Supported conversions:
+   * - **Boolean**: use `1` for `true`, `0` for `false`
+   * - **Null**: use JavaScript `null` (converted to SQL `NULL`)
+   * - **JSON objects**: use `JSON.stringify(object)` to store as string
+   * - **Dates**: use formatted strings like `'YYYY-MM-DD hh:mm:ss'`
    */
   public set(row: Row): this {
     if (!isObj(row)) {
@@ -103,7 +109,7 @@ export class Update extends Query<void> {
     const values = Object.values(row);
 
     values.forEach((v) => {
-      if (!(isStr(v) || isNum(v) || isNull(v))) {
+      if (!(isStr(v) || isNum(v) || isNull(v) || isBool(v))) {
         throw new QueryError(`Invalid UPDATE value: ${String(v)}`);
       }
     });
@@ -137,13 +143,20 @@ export class Update extends Query<void> {
    * @returns The `Update` query instance (`this`) to allow method chaining.
    * @throws `QueryError` if `condition` is not a function.
    */
-  public where(condition: (col: Col, con: Con) => void): this {
+  public where(condition: (col: Col, con: Con) => void): this;
+  public where(condition: Condition): this;
+  public where(condition: ((col: Col, con: Con) => void) | Condition): this {
+    if (condition instanceof Condition) {
+      this.state.condition = condition;
+      return this;
+    }
+
     if (!isFunc(condition)) {
       throw new QueryError(`Invalid UPDATE condition: ${String(condition)}`);
     }
 
     if (isUndefined(this.state.condition)) {
-      this.state.condition = new Condition(this);
+      this.state.condition = new Condition(this.connection.driver);
     }
 
     condition(
@@ -192,7 +205,7 @@ export class Update extends Query<void> {
    */
   public paren(): this {
     if (isUndefined(this.state.condition)) {
-      this.state.condition = new Condition(this);
+      this.state.condition = new Condition(this.connection.driver);
     }
 
     this.state.condition.paren();
@@ -207,7 +220,7 @@ export class Update extends Query<void> {
    */
   public open(): this {
     if (isUndefined(this.state.condition)) {
-      this.state.condition = new Condition(this);
+      this.state.condition = new Condition(this.connection.driver);
     }
 
     this.state.condition.open();

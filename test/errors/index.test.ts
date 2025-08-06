@@ -5,6 +5,7 @@ import {
   CommitTransactionError,
   CreateConnectionError,
   ForbiddenError,
+  MaintenanceError,
   MaxConnectionError,
   MaxQueueSizeError,
   MaxQueueTimeError,
@@ -13,6 +14,7 @@ import {
   RollbackTransactionError,
   ServerError,
   ShutdownError,
+  ValidatorError,
 } from '../../src';
 
 describe('QueryError', () => {
@@ -249,6 +251,40 @@ describe('ServerError', () => {
     const error = new ServerError(customMessage);
     expect(error.message).toBe(customMessage);
     expect(error).toBeInstanceOf(ServerError);
+    expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe('MaintenanceError', () => {
+  test('should create an error with the default message', () => {
+    const error = new MaintenanceError();
+    expect(error.message).toBe('Service unavailable');
+    expect(error).toBeInstanceOf(MaintenanceError);
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  test('should create an error with a custom message', () => {
+    const customMessage = 'Unexpected failure';
+    const error = new MaintenanceError(customMessage);
+    expect(error.message).toBe(customMessage);
+    expect(error).toBeInstanceOf(MaintenanceError);
+    expect(error).toBeInstanceOf(Error);
+  });
+});
+
+describe('ValidatorError', () => {
+  test('should create an error with the default message', () => {
+    const error = new ValidatorError();
+    expect(error.message).toBe('Validator issue');
+    expect(error).toBeInstanceOf(ValidatorError);
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  test('should create an error with a custom message', () => {
+    const customMessage = 'Unexpected failure';
+    const error = new ValidatorError(customMessage);
+    expect(error.message).toBe(customMessage);
+    expect(error).toBeInstanceOf(ValidatorError);
     expect(error).toBeInstanceOf(Error);
   });
 });

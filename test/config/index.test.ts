@@ -32,8 +32,8 @@ describe('loadSync()', () => {
     expect(config.typescript.enabled).toBe(false);
     expect(config.typescript.src).toBe('src');
     expect(config.typescript.dist).toBe('dist');
-    expect(config.tools).toEqual({});
-    expect(config.globals).toEqual({});
+    expect(config.tools).toBeDefined();
+    expect(config.globals).toBeDefined();
   });
 
   it('should reject with an error if the configuration is not an object', () => {

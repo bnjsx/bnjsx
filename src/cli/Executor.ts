@@ -27,6 +27,8 @@ import {
   isPromise,
 } from '../helpers';
 import { AddEnvCommand } from './commands/AddEnvCommand';
+import { UpCommand } from './commands/UpCommand';
+import { DownCommand } from './commands/DownCommand';
 
 /**
  * Type representing an array of registered commands.
@@ -60,6 +62,8 @@ const commands: Commands = [
   { name: 'seed', command: SeedCommand },
   { name: 'clear', command: ClearCommand },
   { name: 'fetch', command: FetchCommand },
+  { name: 'up', command: UpCommand },
+  { name: 'down', command: DownCommand },
   { name: 'version', command: VersionCommand },
   { name: '-v', command: VersionCommand },
 ];

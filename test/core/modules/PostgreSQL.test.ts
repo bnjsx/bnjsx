@@ -295,6 +295,9 @@ describe('PostgreSQL', () => {
       await expect(connection.query('sql', [])).resolves.toBeUndefined();
       await expect(connection.query('sql', [1, 2])).resolves.not.toThrow();
       await expect(connection.query('sql', ['simon'])).resolves.not.toThrow();
+      await expect(
+        connection.query('sql', ['simon', 1, true, false])
+      ).resolves.not.toThrow();
       await expect(connection.query('sql', {} as any)).rejects.toThrow(
         'Invalid query values'
       );

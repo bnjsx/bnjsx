@@ -2,26 +2,16 @@ import * as http from 'http';
 import * as https from 'https';
 import * as fs from 'fs';
 import EventEmitter from 'events';
-import mime from 'mime-types';
-import { access, stat } from 'fs/promises';
-import { randomBytes } from 'crypto';
-import { Router } from './Router';
+import { RouteMatch, Router } from './Router';
 import { Request } from './Request';
 import { Response } from './Response';
-import { isAbsolute, normalize, resolve as resolver } from 'path';
-import {
-  green,
-  isArr,
-  isArrOfStr,
-  isChildOf,
-  isFullArr,
-  isFunc,
-  orange,
-} from '../../helpers';
-import { AppOptions, config, OriginFunc } from '../../config';
-import { bugger, isPromise, isStr } from '../../helpers';
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../errors';
-import { isTrue, UTC } from '../../helpers';
+import { AppOptions, config } from '../../config';
+import { isChildOf, isSubclass } from '../../helpers';
+import { bugger, orange, isPromise, isStr, isFunc, isArr } from '../../helpers';
+import { NotFoundError } from '../../errors';
+import { Service } from './Service';
+import { Entry } from '../validation/Entry';
+import { Middleware } from '../middlewares';
 
 /**
  * Symbol representing the start event.
@@ -54,29 +44,14 @@ export const STOPPED = Symbol('STOPPED');
 export class AppError extends Error {}
 
 /**
- * Represents a range with a start, end, and size.
- *
- * @property `start` - The starting point of the range.
- * @property `end` - The ending point of the range.
- * @property `size` - The size of the range.
+ * A class constructor type for creating instances of a Service-based router.
  */
-export type Range = { start: number; end: number; size: number };
+export type RouterConstructor = new (req: Request, res: Response) => Service;
 
 /**
- * Type definition for middleware functions.
- *
- * Middleware functions are executed during the request-response lifecycle.
- *
- * @param req The request object.
- * @param res The response object.
- * @param err Optional error to handle.
- * @returns A promise that resolves once the middleware processing is complete.
+ * A class constructor type for creating instances of a Service-based router.
  */
-export type Middleware = (
-  req: Request,
-  res: Response,
-  err?: Error
-) => Promise<void>;
+export type RouterInstance = Service | Router;
 
 /**
  * Retrieves the application key (APP_KEY) from environment variables.
@@ -95,429 +70,31 @@ export function appKey(): string {
 }
 
 /**
- * Determines if the given name is included in the origins.
+ * Removes the given namespace prefix from a path and normalizes the result.
  *
- * @param name - The name to check against the origins.
- * @param origins - A list of origins, a wildcard '*', or a function to validate the name.
+ * Useful for routing systems to extract the sub-path relative to a router's mount point.
+ * Ensures a leading slash and handles trailing slashes safely.
  *
- * @returns A promise that resolves to true if the name is included in the origins, false otherwise.
+ * @param namespace - The route prefix or mount path.
+ * @param path - The full request path to process.
+ * @returns The path with the namespace removed. Always starts with '/'.
+ *
+ * @example
+ * stripNamespace('/admin', '/admin/users'); // '/users'
+ * stripNamespace('/api/v1', '/api/v1');     // '/'
+ * stripNamespace('/', '/login');            // '/login'
  */
-export function origin(
-  name: string,
-  origins: string[] | '*' | OriginFunc
-): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    if (origins === '*') return resolve(true);
-    if (isArrOfStr(origins)) return resolve(origins.includes(name));
-    if (isFunc(origins)) return resolve(origins(name));
-    return resolve(false);
-  });
-}
-
-/**
- * Parses the Range HTTP header and determines the byte range for a resource.
- *
- * @param header - The value of the Range HTTP header (e.g., 'bytes=100-200').
- * @param size - The size of the resource being requested.
- *
- * @returns An object with `start`, `end`, and `size` properties, or null if the header is invalid.
- */
-export function ranger(header: string, size: number): Range | null {
-  const match = header.match(/^bytes=(\d+)?-(\d+)?$/);
-
-  if (!match) return null;
-
-  let start = match[1] ? parseInt(match[1], 10) : null;
-  let end = match[2] ? parseInt(match[2], 10) : null;
-
-  if (start === null && end === null) return null;
-
-  if (start === null) (start = size - end), (end = size - 1);
-
-  if (end === null) end = size - 1;
-
-  if (start < 0 || start >= size || end < 0 || end >= size || start > end) {
-    return null;
+export function stripNamespace(namespace: string, path: string): string {
+  // Normalize trailing slashes
+  if (path !== '/' && path.endsWith('/')) {
+    path = path.slice(0, -1);
   }
 
-  return { start, end, size };
-}
+  if (namespace !== '/' && path.startsWith(namespace)) {
+    return path.slice(namespace.length) || '/';
+  }
 
-/**
- * Parses the cookie header and populates `req.cookies`.
- *
- * @param req - The request object.
- * @param res - The response object (not used in this function).
- *
- * @returns A promise that resolves once the cookies are parsed and set in `req.cookies`.
- */
-export function cookie(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve) => {
-    const cookie = req.getHeader('cookie');
-
-    if (!isStr(cookie)) return (req.cookies = {}) && resolve();
-
-    req.cookies = cookie
-      .split(';')
-      .map((cookie) => cookie.trim())
-      .reduce((cookies: Record<string, string>, cookie) => {
-        const [key, value] = cookie.split('=');
-        if (key && value) cookies[key] = decodeURIComponent(value);
-        return cookies;
-      }, {});
-
-    return resolve();
-  });
-}
-
-/**
- * Parses the JSON content from the request body.
- *
- * @param req - The request object.
- * @param res - The response object (not used in this function).
- *
- * @returns A promise that resolves once the JSON body is parsed or rejects if an error occurs.
- */
-export function json(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const content = req.getHeader('content-type') || '';
-
-    if (!content.includes('application/json')) return resolve();
-
-    const chunks = [];
-
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      try {
-        if (chunks.length > 0) {
-          req.body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-        }
-
-        resolve();
-      } catch (err) {
-        reject(err);
-      }
-    });
-  });
-}
-
-/**
- * Parses the plain text or HTML content from the request body.
- *
- * @param req - The request object.
- * @param res - The response object (not used in this function).
- *
- * @returns A promise that resolves once the text content is parsed.
- */
-export function text(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve) => {
-    const type = req.getHeader('content-type') || '';
-
-    if (!(type.includes('text/plain') || type.includes('text/html'))) {
-      return resolve();
-    }
-
-    const chunks = [];
-
-    req.on('data', (chunk) => chunks.push(chunk));
-    req.on('end', () => {
-      req.body = Buffer.concat(chunks).toString('utf8');
-      resolve();
-    });
-  });
-}
-
-/**
- * Serves static assets, supporting caching, compression, and range requests.
- *
- * @param req - The request object.
- * @param res - The response object.
- *
- * @returns A promise that resolves once the asset is served or rejects if there is an error.
- */
-export function asset(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let { root, gzip, cache } = config().loadSync().public;
-
-    if (!isAbsolute(root)) root = resolver(config().resolveSync(), root);
-
-    const path = resolver(root, normalize('./' + req.path));
-
-    if (!path.startsWith(root)) {
-      return reject(
-        new ForbiddenError(`The requested resource is forbidden at: '${path}'`)
-      );
-    }
-
-    stat(path)
-      .then((stats) => {
-        if (!stats.isFile()) return resolve();
-
-        const buffer = 'application/octet-stream';
-        const etag = `${stats.mtimeMs}-${stats.size}`;
-        const gzp = path.concat('.gz');
-        const type = mime.contentType(path) || buffer;
-
-        const matched = req.getHeader('If-None-Match');
-        const modified = req.getHeader('If-Modified-Since') as string;
-        const encoding = req.getHeader('Accept-Encoding');
-        const range = req.getHeader('Range');
-
-        res.setHeader('Content-Type', type);
-        res.setHeader('Accept-Ranges', 'bytes');
-
-        if (!range) {
-          res.setHeader('ETag', etag);
-          res.setHeader('Last-Modified', stats.mtimeMs.toString());
-          res.setHeader('Cache-Control', `public, max-age=${cache}`);
-        }
-
-        // Handle caching: ETag takes precedence over Last-Modified
-        if (matched && matched === etag) {
-          return resolve(res.status(304).send());
-        }
-
-        if (modified && modified === stats.mtimeMs.toString()) {
-          return resolve(res.status(304).send());
-        }
-
-        // If no range is specified, send the entire file
-        if (!range || !isStr(range)) {
-          res.setHeader('Content-Length', stats.size);
-
-          if (gzip && encoding.includes('gzip')) {
-            return access(gzp)
-              .then(() => {
-                res.setHeader('Content-Encoding', 'gzip');
-                resolve(res.stream(fs.createReadStream(gzp)));
-              })
-              .catch(() => resolve(res.stream(fs.createReadStream(path))));
-          }
-
-          return resolve(res.stream(fs.createReadStream(path)));
-        }
-
-        const ranges = ranger(range, stats.size);
-
-        if (ranges) {
-          const { start, end, size } = ranges;
-          res.status(206); // Partial-Content
-          res.setHeader('Content-Length', end - start + 1);
-          res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
-          return resolve(res.stream(fs.createReadStream(path, { start, end })));
-        }
-
-        res.setHeader('Content-Range', `bytes */${stats.size}`);
-        return resolve(res.status(416).send());
-      })
-      .catch((err) => (err.code !== 'ENOENT' ? reject(err) : resolve()));
-  });
-}
-
-/**
- * Handles Cross-Origin Resource Sharing (CORS) headers for the response.
- *
- * @param req - The request object.
- * @param res - The response object.
- *
- * @returns A promise that resolves once the CORS headers are set or rejects if the origin is forbidden.
- */
-export function cors(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!req.headers.origin) return resolve();
-
-    const options = config().loadSync<AppOptions>().cors;
-
-    origin(req.headers.origin, options.origin)
-      .then((allowed) => {
-        if (!allowed) {
-          return reject(
-            new ForbiddenError(
-              `This origin is forbidden: '${req.headers.origin}'`
-            )
-          );
-        }
-
-        res.setHeader('Vary', 'Origin'); // Cache responses per origin
-        res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
-
-        if (options.credentials) {
-          res.setHeader(
-            'Access-Control-Allow-Credentials',
-            String(options.credentials)
-          );
-        }
-
-        if (options.methods) {
-          res.setHeader(
-            'Access-Control-Allow-Methods',
-            options.methods.join(', ')
-          );
-        }
-
-        if (options.headers) {
-          res.setHeader(
-            'Access-Control-Allow-Headers',
-            options.headers.join(', ')
-          );
-        }
-
-        if (options.expose) {
-          res.setHeader(
-            'Access-Control-Expose-Headers',
-            options.expose.join(', ')
-          );
-        }
-
-        if (options.maxAge) {
-          res.setHeader('Access-Control-Max-Age', options.maxAge);
-        }
-
-        if (req.method === 'OPTIONS') {
-          return resolve(res.status(204).send());
-        }
-
-        return resolve();
-      })
-      .catch(reject);
-  });
-}
-
-/**
- * Sets security-related HTTP headers for the response.
- *
- * @param req - The request object.
- * @param res - The response object.
- *
- * @returns A promise that resolves once the security headers are set.
- */
-export function secure(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve) => {
-    const options = config().loadSync<AppOptions>().security;
-
-    if (options.contentSecurityPolicy) {
-      const policy = Object.entries(options.contentSecurityPolicy)
-        .map(([key, value]) => {
-          key = key.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-          if (isTrue(value)) return key;
-          if (isArr(value)) return `${key} ${value.join(' ')}`;
-          return `${key} ${value}`;
-        })
-        .join('; ');
-      res.setHeader('Content-Security-Policy', policy);
-    }
-
-    if (options.strictTransportSecurity) {
-      const hsts = [`max-age=${options.strictTransportSecurity.maxAge}`];
-      if (options.strictTransportSecurity.preload) hsts.push('preload');
-      if (options.strictTransportSecurity.includeSubDomains) {
-        hsts.push('includeSubDomains');
-      }
-
-      res.setHeader('Strict-Transport-Security', hsts.join('; '));
-    }
-
-    if (options.referrerPolicy) {
-      res.setHeader('Referrer-Policy', options.referrerPolicy);
-    }
-
-    if (options.crossOriginResourcePolicy) {
-      res.setHeader(
-        'Cross-Origin-Resource-Policy',
-        options.crossOriginResourcePolicy
-      );
-    }
-
-    if (options.crossOriginOpenerPolicy) {
-      res.setHeader(
-        'Cross-Origin-Opener-Policy',
-        options.crossOriginOpenerPolicy
-      );
-    }
-
-    if (options.crossOriginEmbedderPolicy) {
-      res.setHeader(
-        'Cross-Origin-Embedder-Policy',
-        options.crossOriginEmbedderPolicy
-      );
-    }
-
-    if (options.originAgentCluster) {
-      res.setHeader('Origin-Agent-Cluster', '?1');
-    }
-
-    if (options.xContentTypeOptions) {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-    }
-
-    if (options.xDnsPrefetchControl) {
-      res.setHeader('X-DNS-Prefetch-Control', 'off');
-    }
-
-    if (options.xDownloadOptions) {
-      res.setHeader('X-Download-Options', 'noopen');
-    }
-
-    if (options.xFrameOptions) {
-      res.setHeader('X-Frame-Options', options.xFrameOptions);
-    }
-
-    if (options.xPermittedCrossDomainPolicies) {
-      res.setHeader(
-        'X-Permitted-Cross-Domain-Policies',
-        options.xPermittedCrossDomainPolicies
-      );
-    }
-
-    if (options.xssProtection) {
-      res.setHeader('X-XSS-Protection', '0');
-    }
-
-    resolve();
-  });
-}
-
-/**
- * Handles CSRF token generation and validation.
- *
- *
- * @param req - The request object.
- * @param res - The response object.
- *
- * @returns A promise that resolves once the CSRF token is set or validated, or rejects if the token is invalid.
- */
-export function csrf(req: Request, res: Response): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (req.method === 'GET') {
-      if (req.cookies?.csrfToken) {
-        req.csrfToken = req.cookies.csrfToken;
-        return resolve();
-      }
-
-      // Generate CSRF token
-      req.csrfToken = randomBytes(32).toString('base64url');
-      res.cookie('csrfToken', req.csrfToken, {
-        expires: UTC.future.hour(1), // 1 hour
-        path: '/',
-        secure: config().loadSync().env === 'pro',
-        httpOnly: true,
-        sameSite: 'Strict',
-        priority: 'High',
-      });
-
-      return resolve();
-    }
-
-    const cookie = req.cookies?.csrfToken;
-    const token = req.body?.csrfToken;
-
-    // CSRF validation
-    if (!cookie || !token || cookie !== token) {
-      return reject(new BadRequestError('Invalid or missing CSRF token'));
-    }
-
-    return resolve();
-  });
+  return path; // Global namespace: return full path
 }
 
 /**
@@ -545,7 +122,7 @@ export class App extends EventEmitter {
   /**
    * Object that maps namespaces to arrays of routers.
    */
-  private routers: Record<string, Array<Router>> = {};
+  private routers: Record<string, Array<Router | RouterConstructor>> = {};
 
   /**
    * Application options with default values.
@@ -588,11 +165,12 @@ export class App extends EventEmitter {
    * @param middleware The middleware function to be added.
    * @throws `AppError` if the middleware is invalid.
    */
-  public use(middleware: Middleware): void {
+  public use(middleware: Middleware): this {
     if (!isFunc(middleware)) throw new AppError('Invalid middleware function');
     if (middleware.length <= 2) this.middlewares.push(middleware);
     else if (middleware.length === 3) this.handlers.push(middleware);
     else throw new AppError('Invalid middleware function');
+    return this;
   }
 
   /**
@@ -602,11 +180,34 @@ export class App extends EventEmitter {
    * @param router The router to associate with the namespace.
    * @throws `AppError` if the namespace or router is invalid.
    */
-  public namespace(name: string, router: Router): void {
+  public namespace(name: string, router: Router | RouterConstructor): this {
     if (!isStr(name)) throw new AppError('Invalid namespace');
-    if (!isChildOf(router, Router)) throw new AppError('Invalid router');
+    if (!isChildOf(router, Router) && !isSubclass(router, Service)) {
+      throw new AppError('Invalid router');
+    }
+
     if (!isArr(this.routers[name])) this.routers[name] = new Array();
     this.routers[name].push(router);
+    return this;
+  }
+
+  /**
+   * Registers a router under the root namespace (`'/'`).
+   *
+   * Accepts either a `Router` instance or a `Service` subclass.
+   * Throws an error if the router is not valid.
+   *
+   * @param router - A Router instance or a Service-based router constructor.
+   * @throws AppError if the provided router is invalid.
+   */
+  public register(router: Router | RouterConstructor): this {
+    if (!isChildOf(router, Router) && !isSubclass(router, Service)) {
+      throw new AppError('Invalid router');
+    }
+
+    if (!isArr(this.routers['/'])) this.routers['/'] = new Array();
+    this.routers['/'].push(router);
+    return this;
   }
 
   /**
@@ -667,83 +268,49 @@ export class App extends EventEmitter {
   }
 
   /**
-   * Handles errors by rendering appropriate error pages or JSON responses based on the environment and request mode.
+   * The final error handler — executes your registered error handlers, and if none of them handle the error,
+   * it gracefully handles the error itself. It also catches any errors thrown by your error handlers.
    *
-   * @param req The request object.
-   * @param res The response object.
-   * @param err The error to be handled.
-   * @returns A promise that resolves after the error is handled.
+   * This ensures a reliable fallback response is always sent (JSON or HTML depending on mode),
+   * and guarantees that the app never crashes from unhandled errors. If a response cannot be sent,
+   * it will simply resolve to prevent further failure.
+   *
+   * @param req - The incoming request object.
+   * @param res - The response object.
+   * @param err - The error that occurred during request handling.
+   * @returns A promise that always resolves, regardless of the outcome.
    */
   private handler(req: Request, res: Response, err: Error): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (this.options.env === 'dev') bugger(err);
 
-      if (isFullArr(this.handlers)) {
-        return this.execute(this.handlers, req, res, err)
-          .then(resolve)
-          .catch(reject);
-      }
-
-      if (this.options.mode === 'web') {
-        if (err instanceof BadRequestError) {
-          return res
-            .status(400)
-            .render('errors.400')
-            .then(resolve)
-            .catch(reject);
-        }
-
-        if (err instanceof ForbiddenError) {
-          return res
-            .status(403)
-            .render('errors.403')
-            .then(resolve)
-            .catch(reject);
-        }
-
-        if (err instanceof NotFoundError) {
-          return res
-            .status(404)
-            .render('errors.404')
-            .then(resolve)
-            .catch(reject);
-        }
-
-        return res.status(500).render('errors.500').then(resolve).catch(reject);
-      }
-
-      if (err instanceof BadRequestError) {
-        return res
-          .status(400)
-          .json({ error: 'BadRequestError', message: 'Bad Request.' })
-          .then(resolve)
-          .catch(reject);
-      }
-
-      if (err instanceof ForbiddenError) {
-        return res
-          .status(403)
-          .json({ error: 'ForbiddenError', message: 'Access Forbidden.' })
-          .then(resolve)
-          .catch(reject);
-      }
-
-      if (err instanceof NotFoundError) {
-        return res
-          .status(404)
-          .json({
-            error: 'NotFoundError',
-            message: 'The requested resource could not be found.',
-          })
-          .then(resolve)
-          .catch(reject);
-      }
-
-      return res
-        .status(500)
-        .json({ error: 'ServerError', message: 'Ops! Something went wrong.' })
+      return this.execute(this.handlers, req, res, err)
         .then(resolve)
-        .catch(reject);
+        .catch((err) => {
+          if (this.options.env === 'dev') bugger(err);
+
+          if (this.options.mode === 'api') {
+            return res
+              .status(500)
+              .json({
+                success: false,
+                error: {
+                  name: 'ServerError',
+                  message: 'Ops! Something went wrong.',
+                },
+              })
+              .then(resolve)
+              .catch(() => resolve()); // ignore any errors
+          }
+
+          return res
+            .status(500)
+            .html(
+              `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>500 | SERVER ERROR</title><style>body{margin:0;background:#121212;color:#ccc;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;text-align:center}h1{font-weight:400;font-size:0.75rem;letter-spacing:0.1em;text-transform:uppercase;user-select:none}</style></head><body><h1>500 | SERVER ERROR</h1></body></html>`
+            )
+            .then(resolve)
+            .catch(() => resolve()); // ignore any errors
+        });
     });
   }
 
@@ -760,6 +327,8 @@ export class App extends EventEmitter {
       const base = `${protocol}://${host}:${port}`;
       const url = new URL(req.url, base);
 
+      req.href = url.pathname + url.search;
+      req.search = url.search;
       req.protocol = protocol;
       req.host = url.hostname;
       req.port = url.port;
@@ -769,6 +338,10 @@ export class App extends EventEmitter {
       // Access res in req and reverse
       req.response = res;
       res.request = req;
+
+      // Set ip & base
+      req.ip = req.getIp();
+      req.base = req.getBase();
 
       const issue = async () => {
         throw new NotFoundError(`Resource not found at '${req.url}'`);
@@ -785,21 +358,44 @@ export class App extends EventEmitter {
           .then(resolve);
       }
 
-      const router = this.routers[namespace].find((router) => {
-        if (namespace === '/') return router.match(req.path, req.method);
-        return router.match(req.path.replace(namespace, ''), req.method);
-      });
+      let found: { router: RouterInstance; match: RouteMatch } | void;
 
-      if (!router) {
+      for (const r of this.routers[namespace]) {
+        const instance =
+          isFunc(r) && isSubclass(r, Service)
+            ? new (r as RouterConstructor)(req, res)
+            : (r as RouterInstance);
+
+        const path = stripNamespace(namespace, req.path);
+        const match = instance.match(path, req.method);
+
+        if (match) {
+          if (instance instanceof Service) {
+            const query: Record<string, string | string[]> = {};
+
+            for (const key of req.query.keys()) {
+              const values = req.query.getAll(key);
+              query[key] = values.length === 1 ? values[0] : values;
+            }
+
+            instance.query = new Entry(query);
+            instance.params = new Entry(match.params);
+          }
+
+          found = { router: instance, match };
+          break;
+        }
+      }
+
+      if (!found) {
         return this.execute([...this.middlewares, issue], req, res)
           .catch((err) => this.handler(req, res, err))
           .catch(reject)
           .then(resolve);
       }
 
-      const match = router.match(req.path, req.method);
-      const middlewares = [...this.middlewares, ...match.middlewares];
-      req.params = match.params as any;
+      const middlewares = [...this.middlewares, ...found.match.middlewares];
+      req.params = found.match.params as any;
 
       return this.execute(middlewares, req, res)
         .catch((err) => this.handler(req, res, err))

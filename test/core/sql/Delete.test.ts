@@ -40,12 +40,22 @@ describe('Delete', () => {
     it('should throw QueryError if condition is not a function', () => {
       expect(() => del.where('invalid' as any)).toThrow(QueryError);
     });
+
+    it('should accept condition instances as well', () => {
+      const condition = new Condition(mock.connection().driver);
+      condition.col('age').lessThan(12).and().col('location').like('paris');
+      const query = del.from('table').where(condition);
+      expect(query.build()).toBe(
+        'DELETE FROM table WHERE age < ? AND location LIKE ?;'
+      );
+      expect(query.values).toEqual([12, 'paris']);
+    });
   });
 
   describe('.and()', () => {
     it('should append AND to the condition if it exists', () => {
       // Defined condition
-      del.condition = new Condition(del);
+      del.condition = new Condition(mock.connection().driver);
 
       // Spy on del.condition.and
       const spy = jest.spyOn(del.condition, 'and');
@@ -67,7 +77,7 @@ describe('Delete', () => {
   describe('.or()', () => {
     it('should append OR to the condition if it exists', () => {
       // Defined condition
-      del.condition = new Condition(del);
+      del.condition = new Condition(mock.connection().driver);
 
       // Spy on del.condition.or
       const spy = jest.spyOn(del.condition, 'or');
@@ -89,7 +99,7 @@ describe('Delete', () => {
   describe('.paren()', () => {
     it('should adds parentheses around conditions', () => {
       // Defined condition
-      del.condition = new Condition(del);
+      del.condition = new Condition(mock.connection().driver);
 
       // Spy on del.condition.paren
       const spy = jest.spyOn(del.condition, 'paren');

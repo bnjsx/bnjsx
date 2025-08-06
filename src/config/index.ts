@@ -1,7 +1,44 @@
 import { Cluster } from '../core/modules/Cluster';
-import { Config, ConfigError, isDefined, isSymbol } from '../helpers';
+import {
+  Config,
+  ConfigError,
+  escapeHTML,
+  base,
+  isDefined,
+  isSymbol,
+  toFloat,
+  toLower,
+  toLowerAt,
+  toTitle,
+  toUpper,
+  toUpperAt,
+  UTC,
+  Vite,
+  toShort,
+  toSnap,
+  toSize,
+  round,
+  floor,
+  percent,
+  pad,
+  comma,
+  trim,
+  avg,
+  fresh,
+  map,
+  join,
+  isFullArr,
+  isFullObj,
+  isFullStr,
+  isNum,
+  isFloat,
+  botInput,
+  csrfInput,
+} from '../helpers';
 import { isArr, isArrOfStr, isFunc, isInt } from '../helpers';
-import { isBool, isChildOf, isObj, isStr, isUndefined } from '../helpers';
+import { isBool, isObj, isStr, isUndefined } from '../helpers';
+import { chrono, diff } from '../helpers/Chrono';
+import { lang } from '../helpers/Lang';
 
 /**
  * A function to check if a given origin is acceptable.
@@ -681,6 +718,50 @@ Bnjsx.register((config: AppOptions) => {
     );
   }
 
+  config.tools = {
+    ...config.tools,
+    arr: isFullArr,
+    obj: isFullObj,
+    str: isFullStr,
+    num: isNum,
+    int: isInt,
+    flo: isFloat,
+    bot: botInput,
+    csrf: csrfInput,
+    map,
+    fresh, // check if date is still fresh
+    chrono, // formats date to human readable format
+    diff, // formats date to human readable format
+    round, // round float up 6.6 => 7
+    floor, // floor float down 6.6 => 6
+    percent, // 33 => "33%"
+    pad, // 9 => 09
+    comma, // 1000 => 1,000
+    trim, // 'hi ' => 'hi'
+    join, // [1, 2, 3] => '1, 2, 3'
+    avg, // counts avg and returns float 9.0
+    lang, // load your locals into the template
+    html: escapeHTML, // escapes html
+    snap: toSnap, // converts long strings to elipsis version 'hello...'
+    shorten: toShort, // formate huge numbers properly like 2100 2.1k
+    float: toFloat, // converts anything to a float even 'hello' becomse 0.0
+    header: toTitle, // formats string to Title
+    size: toSize, // returns readbale bytes size 1MB and so on
+    upper: toUpper, // upper case string
+    lower: toLower, // lower case string
+    upperat: toUpperAt, // upert case case at index
+    lowerat: toLowerAt, // lower case char at index
+    year: UTC.get.year.bind(UTC), // get current year
+    date: UTC.get.date.bind(UTC), // get current date
+    time: UTC.get.time.bind(UTC), // get current time
+    month: UTC.get.month.bind(UTC), // get current month
+    day: UTC.get.day.bind(UTC), // get current day
+    hour: UTC.get.hour.bind(UTC), // get current hour
+    minute: UTC.get.minute.bind(UTC), // get current min
+    second: UTC.get.second.bind(UTC), // get current second
+    vite: Vite.assets.bind(Vite), // get vite assets
+  };
+
   return config;
 });
 
@@ -694,6 +775,11 @@ Bnjsx.register((config: AppOptions) => {
       `Invalid globals: Expected an object but received ${typeof config.globals}.`
     );
   }
+
+  config.globals = {
+    ...config.globals,
+    base: base(config.host, config.protocol, config.port),
+  };
 
   return config;
 });

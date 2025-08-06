@@ -7,6 +7,7 @@ import {
   isArrOfArr,
   isArrOfObj,
   isArrOfStr,
+  isBool,
   isEmptyArr,
   isFullStr,
   isNull,
@@ -192,13 +193,18 @@ export class Insert<
    * @throws `QueryError` if the row is invalid or columns do not match.
    *
    * @notes
-   * - The keys in the `row` object represent column names (e.g. `first_name` `last_name`).
-   * - The values in the `row` object represent the insert values and must be either `string` or `number` or `null`.
-   * - All values can be represented using `strings` and `numbers` and `null`:
-   *   - Boolean: use `1` for true and `0` for false
-   *   - Null: use `null`
-   *   - JSON: use `JSON.stringify(object)` for objects
-   *   - Dates: use date strings formatted as `'YYYY-MM-DD hh:mm:ss'`
+   * - The keys in the `row` object represent column names (e.g. `first_name`, `last_name`).
+   * - The values in the `row` object must be one of the supported types:
+   *   - `string`
+   *   - `number`
+   *   - `boolean`
+   *   - `null`
+   *
+   * Supported conversions:
+   * - **Boolean**: `true` is stored as `1`, `false` as `0`
+   * - **Null**: use JavaScript `null` (will be converted to SQL `NULL`)
+   * - **JSON objects**: use `JSON.stringify(...)` to store as string
+   * - **Dates**: use formatted strings like `'YYYY-MM-DD hh:mm:ss'`
    */
   public row(row: Row): this {
     if (!isObj(row)) {
@@ -208,34 +214,29 @@ export class Insert<
     if (isArr(this.columns)) {
       const columns = Object.keys(row);
 
-      // Test length
+      // Validate length
       if (this.columns.length !== columns.length) {
-        throw new QueryError(`Invalid INSERT row: ${row}`);
+        throw new QueryError(`Invalid INSERT row: ${JSON.stringify(row)}`);
       }
 
-      // Test names
-      if (!this.columns.every((column) => columns.includes(column))) {
-        throw new QueryError(`Invalid INSERT row: ${row}`);
+      // Validate keys
+      if (!this.columns.every((col) => columns.includes(col))) {
+        throw new QueryError(`Invalid INSERT row: ${JSON.stringify(row)}`);
       }
+
+      // Push in column order
+      this.values.push(this.columns.map((col) => row[col]));
     } else {
       const columns = Object.keys(row);
 
       if (isEmptyArr(columns)) {
-        throw new QueryError(`Empty INSERT row: ${row}`);
+        throw new QueryError(`Empty INSERT row: ${JSON.stringify(row)}`);
       }
 
       this.columns = columns;
+      this.values.push(columns.map((col) => row[col]));
     }
 
-    const values = Object.values(row);
-
-    values.forEach((value) => {
-      if (!(isNull(value) || isStr(value) || isNum(value))) {
-        throw new QueryError(`Invalid INSERT value: ${String(value)}`);
-      }
-    });
-
-    this.values.push(values);
     return this;
   }
 
@@ -247,21 +248,22 @@ export class Insert<
    * @throws `QueryError` if the rows array is empty or contains invalid rows.
    *
    * @notes
-   * - The keys in the `row` object represent column names (e.g. `first_name` `last_name`).
-   * - The values in the `row` object represent the insert values and must be either `string` or `number` or `null`.
-   * - All values can be represented using `strings` and `numbers` and `null`:
-   *   - Boolean: use `1` for true and `0` for false
-   *   - Null: use `null`
-   *   - JSON: use `JSON.stringify(object)` for objects
-   *   - Dates: use date strings formatted as `'YYYY-MM-DD hh:mm:ss'`
+   * - The keys in each row object represent column names (e.g. `first_name`, `last_name`).
+   * - The values in each row object must be one of the supported types:
+   *   - `string`
+   *   - `number`
+   *   - `boolean`
+   *   - `null`
+   *
+   * Supported conversions:
+   * - **Boolean**: `true` is stored as `1`, `false` as `0`
+   * - **Null**: use JavaScript `null` (converted to SQL `NULL`)
+   * - **JSON objects**: use `JSON.stringify(...)` to store as string
+   * - **Dates**: use formatted strings like `'YYYY-MM-DD hh:mm:ss'`
    */
   public rows(rows: Rows): this {
     if (!isArrOfObj(rows)) {
       throw new QueryError(`Invalid rows: ${String(rows)}`);
-    }
-
-    if (rows.length < 2) {
-      throw new QueryError(`Bulk insert requires at least 2 rows.`);
     }
 
     rows.forEach((row) => this.row(row));

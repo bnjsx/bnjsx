@@ -1,21 +1,9 @@
+import { config } from '../../config';
 import { QueryError } from '../../errors';
-
-import {
-  isMySQL,
-  isPoolCon,
-  isPostgreSQL,
-  isChildOf,
-  isEmptyArr,
-  isEmptyStr,
-  isFullStr,
-  isFunc,
-  isInt,
-  isNum,
-  isStr,
-} from '../../helpers';
-import { PoolConnection } from '../modules/Pool';
-import { Query } from './Query';
-import { Select } from './Select';
+import { isInt, isNum, isStr } from '../../helpers';
+import { isEmptyArr, isEmptyStr, isFullStr } from '../../helpers';
+import { isMySQL, isPostgreSQL, isDriver } from '../../helpers';
+import { Driver } from '../modules/Driver';
 
 /**
  * Represents a reference to a database column.
@@ -71,20 +59,16 @@ export function exDate(col: string): string {
  * @returns The SQL expression for extracting the time part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exTime(col: string, con: PoolConnection): string {
+export function exTime(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `TIME(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `TO_CHAR(${col}, 'HH24:MI:SS')`;
   }
 
@@ -99,20 +83,16 @@ export function exTime(col: string, con: PoolConnection): string {
  * @returns The SQL expression for extracting the year part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exYear(col: string, con: PoolConnection): string {
+export function exYear(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `YEAR(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `EXTRACT(YEAR FROM ${col})`;
   }
 
@@ -127,20 +107,16 @@ export function exYear(col: string, con: PoolConnection): string {
  * @returns The SQL expression for extracting the month part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exMonth(col: string, con: PoolConnection): string {
+export function exMonth(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `MONTH(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `EXTRACT(MONTH FROM ${col})`;
   }
 
@@ -155,20 +131,16 @@ export function exMonth(col: string, con: PoolConnection): string {
  * @returns The SQL expression for extracting the day part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exDay(col: string, con: PoolConnection): string {
+export function exDay(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `DAY(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `EXTRACT(DAY FROM ${col})`;
   }
 
@@ -183,20 +155,16 @@ export function exDay(col: string, con: PoolConnection): string {
  * @returns The SQL expression for extracting the hour part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exHour(col: string, con: PoolConnection): string {
+export function exHour(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `HOUR(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `EXTRACT(HOUR FROM ${col})`;
   }
 
@@ -211,20 +179,16 @@ export function exHour(col: string, con: PoolConnection): string {
  * @returns The SQL expression for extracting the minute part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exMinute(col: string, con: PoolConnection): string {
+export function exMinute(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `MINUTE(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `EXTRACT(MINUTE FROM ${col})`;
   }
 
@@ -239,62 +203,20 @@ export function exMinute(col: string, con: PoolConnection): string {
  * @returns The SQL expression for extracting the second part.
  * @throws `QueryError` if the column name or connection is invalid.
  */
-export function exSecond(col: string, con: PoolConnection): string {
+export function exSecond(col: string, driver: Driver): string {
   if (!isStr(col)) {
     throw new QueryError(`Invalid column name: ${col}`);
   }
 
-  if (!isPoolCon(con)) {
-    throw new QueryError(`Invalid connection: ${con}`);
-  }
-
-  if (isMySQL(con.driver)) {
+  if (isMySQL(driver)) {
     return `SECOND(${col})`;
   }
 
-  if (isPostgreSQL(con.driver)) {
+  if (isPostgreSQL(driver)) {
     return `EXTRACT(SECOND FROM ${col})`;
   }
 
   return `STRFTIME('%S', ${col})`;
-}
-
-/**
- * Comparison operators for SQL query conditions.
- * These constants represent different SQL operators used to build conditions.
- * They are typically used to compare columns or values in the `WHERE` clause of a query.
- */
-export const EQUAL = Symbol('=');
-export const NOT_EQUAL = Symbol('!=');
-
-export const LESS = Symbol('<');
-export const LESS_OR_EQUAL = Symbol('<=');
-
-export const MORE = Symbol('>');
-export const MORE_OR_EQUAL = Symbol('>=');
-
-/**
- * Type representing valid comparison operators.
- * The operators are used in conditions for SQL queries to compare values.
- */
-type Operator =
-  | typeof EQUAL
-  | typeof NOT_EQUAL
-  | typeof LESS
-  | typeof LESS_OR_EQUAL
-  | typeof MORE
-  | typeof MORE_OR_EQUAL;
-
-/**
- * Checks if the provided operator is valid.
- *
- * @param operator The operator to validate.
- * @returns The `Condition` instance for chaining further query conditions.
- */
-function invalidOperator(operator: any): boolean {
-  return ![EQUAL, NOT_EQUAL, LESS, LESS_OR_EQUAL, MORE, MORE_OR_EQUAL].includes(
-    operator
-  );
 }
 
 /**
@@ -340,11 +262,6 @@ export class Condition {
   private opened: number = 0;
 
   /**
-   * The associated query instance
-   */
-  private query: any;
-
-  /**
    * Represents the main column involved in the condition.
    */
   private column: string;
@@ -352,21 +269,19 @@ export class Condition {
   /**
    * Represents the main column involved in the condition.
    */
-  public values: Array<string | number | null> = new Array();
+  public values: Array<string | number | boolean | null> = new Array();
+
+  /**
+   * The connection pool.
+   */
+  private driver: Driver;
 
   /**
    * Constructs a `Condition` instance for the given query
-   *
-   * @param query The query instance associated with this condition.
-   *
-   * @throws `QueryError` if the provided query is invalid.
    */
-  constructor(query: Query<unknown>) {
-    if (!isChildOf(query, Query)) {
-      throw new QueryError(`Invalid query instance: ${String(query)}`);
-    }
-
-    this.query = query;
+  constructor(driver: Driver) {
+    if (!isDriver(driver)) throw new QueryError('Invalid driver');
+    this.driver = driver;
   }
 
   /**
@@ -376,51 +291,7 @@ export class Condition {
    * @returns The `Condition` instance for chaining further query conditions.
    */
   public build(): string {
-    const condition = this.stack.join('').trim();
-
-    if (this.opened !== 0) {
-      throw new QueryError(`Syntax error: Unmatched parentheses.`);
-    }
-
-    if (/\(\s*AND|\(\s*OR/.test(condition)) {
-      throw new QueryError(
-        'Invalid syntax: AND/OR cannot directly follow an opening parenthesis.'
-      );
-    }
-
-    if (/AND\s*\)|OR\s*\)/.test(condition)) {
-      throw new QueryError(
-        'Invalid syntax: AND/OR cannot directly precede a closing parenthesis.'
-      );
-    }
-
-    if (/AND\s*AND|OR\s*OR/.test(condition)) {
-      throw new QueryError(
-        'Invalid syntax: Consecutive AND/OR operators found.'
-      );
-    }
-
-    if (/\(\s*\)/.test(condition)) {
-      throw new QueryError('Invalid syntax: Empty parentheses found.');
-    }
-
-    if (condition.endsWith('AND') || condition.endsWith('OR')) {
-      throw new QueryError(
-        'Invalid syntax: Condition cannot end with an operator.'
-      );
-    }
-
-    if (condition.startsWith('AND') || condition.startsWith('OR')) {
-      throw new QueryError(
-        'Invalid syntax: Condition cannot start with an operator.'
-      );
-    }
-
-    if (isEmptyStr(condition)) {
-      throw new QueryError('Invalid syntax: Condition cannot be empty.');
-    }
-
-    return condition;
+    return this.stack.join('').trim();
   }
 
   /**
@@ -430,19 +301,15 @@ export class Condition {
    * @param values Optional values to replace placeholders within the condition.
    * @throws `QueryError` if the condition is not a string, or if provided values are not valid.
    */
-  public raw(condition: string, ...values: Array<string | number>): this {
+  public raw(
+    condition: string,
+    ...values: Array<string | number | boolean>
+  ): this {
     if (!isFullStr(condition)) {
       throw new QueryError(`Invalid condition: ${String(condition)}`);
     }
 
-    values.forEach((value) => {
-      if (!(isFullStr(value) || isNum(value))) {
-        throw new QueryError(`Invalid condition value: ${String(value)}`);
-      }
-
-      this.values.push(value);
-    });
-
+    this.values.push(...values);
     this.stack.push(condition);
     return this;
   }
@@ -592,7 +459,7 @@ export class Condition {
     const placeholder = isRef ? time.column : '?';
 
     this.stack.push(
-      `${not}${exTime(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exTime(this.column, this.driver)} = ${placeholder}`
     );
     if (!isRef) this.values.push(time);
 
@@ -629,7 +496,7 @@ export class Condition {
     const placeholder = isRef ? year.column : '?';
 
     this.stack.push(
-      `${not}${exYear(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exYear(this.column, this.driver)} = ${placeholder}`
     );
 
     if (!isRef) this.values.push(year);
@@ -667,7 +534,7 @@ export class Condition {
     const not = this.negate ? 'NOT ' : '';
     const placeholder = isRef ? month.column : '?';
     this.stack.push(
-      `${not}${exMonth(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exMonth(this.column, this.driver)} = ${placeholder}`
     );
     if (!isRef) this.values.push(month);
 
@@ -705,7 +572,7 @@ export class Condition {
     const placeholder = isRef ? day.column : '?';
 
     this.stack.push(
-      `${not}${exDay(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exDay(this.column, this.driver)} = ${placeholder}`
     );
     if (!isRef) this.values.push(day);
 
@@ -743,7 +610,7 @@ export class Condition {
     const placeholder = isRef ? hour.column : '?';
 
     this.stack.push(
-      `${not}${exHour(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exHour(this.column, this.driver)} = ${placeholder}`
     );
     if (!isRef) this.values.push(hour);
 
@@ -781,7 +648,7 @@ export class Condition {
     const placeholder = isRef ? minute.column : '?';
 
     this.stack.push(
-      `${not}${exMinute(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exMinute(this.column, this.driver)} = ${placeholder}`
     );
     if (!isRef) this.values.push(minute);
 
@@ -819,7 +686,7 @@ export class Condition {
     const placeholder = isRef ? second.column : '?';
 
     this.stack.push(
-      `${not}${exSecond(this.column, this.query.connection)} = ${placeholder}`
+      `${not}${exSecond(this.column, this.driver)} = ${placeholder}`
     );
     if (!isRef) this.values.push(second);
 
@@ -834,17 +701,14 @@ export class Condition {
    * @throws `QueryError` If the value or column is invalid.
    * @returns The `Condition` instance for chaining further query conditions.
    */
-  public equal(value: string | number | Ref): this {
+  public equal(value: string | number | boolean | null | Ref): this {
     if (!isFullStr(this.column)) {
       throw new QueryError(`Invalid column: ${String(this.column)}`);
     }
 
+    if (value === null) return this.isNull();
+
     const isRef = value instanceof Ref;
-
-    if (!(isRef || isFullStr(value) || isNum(value))) {
-      throw new QueryError(`Invalid value: ${String(value)}`);
-    }
-
     const not = this.negate ? 'NOT ' : '';
     const placeholder = isRef ? value.column : '?';
 
@@ -869,11 +733,6 @@ export class Condition {
     }
 
     const isRef = value instanceof Ref;
-
-    if (!(isRef || isFullStr(value) || isNum(value))) {
-      throw new QueryError(`Invalid value: ${String(value)}`);
-    }
-
     const not = this.negate ? 'NOT ' : '';
     const placeholder = isRef ? value.column : '?';
 
@@ -897,11 +756,6 @@ export class Condition {
     }
 
     const isRef = value instanceof Ref;
-
-    if (!(isRef || isFullStr(value) || isNum(value))) {
-      throw new QueryError(`Invalid value: ${String(value)}`);
-    }
-
     const not = this.negate ? 'NOT ' : '';
     const placeholder = isRef ? value.column : '?';
 
@@ -925,11 +779,6 @@ export class Condition {
     }
 
     const isRef = value instanceof Ref;
-
-    if (!(isRef || isFullStr(value) || isNum(value))) {
-      throw new QueryError(`Invalid value: ${String(value)}`);
-    }
-
     const not = this.negate ? 'NOT ' : '';
     const placeholder = isRef ? value.column : '?';
 
@@ -947,17 +796,12 @@ export class Condition {
    * @throws `QueryError` if the value or column is invalid.
    * @returns The `Condition` instance for chaining further query conditions.
    */
-  public greaterThanOrEqual(value: string | number | Ref | Ref): this {
+  public greaterThanOrEqual(value: string | number | Ref): this {
     if (!isFullStr(this.column)) {
       throw new QueryError(`Invalid column: ${String(this.column)}`);
     }
 
     const isRef = value instanceof Ref;
-
-    if (!(isRef || isFullStr(value) || isNum(value))) {
-      throw new QueryError(`Invalid value: ${String(value)}`);
-    }
-
     const not = this.negate ? 'NOT ' : '';
     const placeholder = isRef ? value.column : '?';
 
@@ -1016,7 +860,7 @@ export class Condition {
    * @throws `QueryError` if the column is invalid or if the values array is empty or contains invalid values.
    * @returns The `Condition` instance for chaining further query conditions.
    */
-  public in(...values: Array<string | number | Ref>): this {
+  public in(...values: Array<string | number | boolean | Ref>): this {
     if (!isFullStr(this.column)) {
       throw new QueryError(`Invalid column: ${String(this.column)}`);
     }
@@ -1024,12 +868,6 @@ export class Condition {
     if (isEmptyArr(values)) {
       throw new QueryError(`Values array cannot be empty for IN clause`);
     }
-
-    values.forEach((v) => {
-      if (!(v instanceof Ref || isFullStr(v) || isNum(v))) {
-        throw new QueryError(`Invalid value: ${String(v)}`);
-      }
-    });
 
     const not = this.negate ? 'NOT ' : '';
     const placeholders = values
@@ -1039,36 +877,6 @@ export class Condition {
 
     values.forEach((v) => (v instanceof Ref ? null : this.values.push(v)));
 
-    this.stack.push(condition);
-    this.negate = false;
-
-    return this;
-  }
-
-  /**
-   * Compares the column with a subquery to check if the column's value is in the result of the subquery.
-   *
-   * @param subquery A function that receives a `Select` instance as an argument, which you can use to build the subquery.
-   * @throws `QueryError` if the column is invalid or if the subquery is not a function.
-   * @returns The `Condition` instance for chaining further query conditions.
-   */
-  public inSubquery(subquery: (select: Select) => void): this {
-    if (!isFullStr(this.column)) {
-      throw new QueryError(`Invalid column: ${String(this.column)}`);
-    }
-
-    if (!isFunc(subquery)) {
-      throw new QueryError(`Invalid subquery: ${String(subquery)}`);
-    }
-
-    const select = new Select(this.query.connection);
-
-    subquery(select);
-
-    const not = this.negate ? 'NOT ' : '';
-    const condition = `${not}${this.column} IN (${select.build(true)})`;
-
-    this.values.push(...select.get.values());
     this.stack.push(condition);
     this.negate = false;
 
@@ -1130,107 +938,42 @@ export class Condition {
   }
 
   /**
-   * Checks if any rows exist based on the result of a subquery.
+   * Adds a condition checking if the column is falsy (equals `false`).
    *
-   * @param subquery A function that receives a `Select` instance, which you can use to build the subquery.
-   * @throws `QueryError` if the subquery is not a valid function.
-   * @returns The `Condition` instance for chaining further query conditions.
-   * @note Subquery condition values are not going to be replaced with placeholders.
+   * @throws `QueryError` if the column name is invalid or empty.
+   * @returns The current query instance (`this`) for chaining.
    */
-  public exists(subquery: (select: Select) => void): this {
-    if (!isFunc(subquery)) {
-      throw new QueryError(`Invalid subquery: ${String(subquery)}`);
-    }
-
-    const select = new Select(this.query.connection);
-
-    subquery(select); // build the query
-
-    const not = this.negate ? 'NOT ' : '';
-    const condition = `${not}EXISTS (${select.build(true)})`;
-
-    this.values.push(...select.get.values());
-    this.stack.push(condition);
-    this.negate = false;
-
-    return this;
-  }
-
-  /**
-   * Checks if the column value satisfies a condition when compared to any result from a subquery.
-   * Use this method when you need to check if a column value satisfies a condition for at least one result
-   * from a subquery.
-   *
-   * @param operator The operator (e.g., `=`, `>`, `<`, etc.) to use in the comparison.
-   * @param subquery A function that receives a `Select` instance, which you can use to build the subquery.
-   * @throws `QueryError` if the operator is invalid or the subquery is not a valid function.
-   * @returns The `Condition` instance for chaining further query conditions.
-   */
-  public any(operator: Operator, subquery: (select: Select) => void): this {
+  public isFalse(): this {
     if (!isFullStr(this.column)) {
       throw new QueryError(`Invalid column: ${String(this.column)}`);
     }
 
-    if (invalidOperator(operator)) {
-      throw new QueryError(`Invalid operator: ${String(operator)}`);
-    }
-
-    if (!isFunc(subquery)) {
-      throw new QueryError(`Invalid subquery: ${String(subquery)}`);
-    }
-
-    const select = new Select(this.query.connection);
-
-    subquery(select); // build the query
-
     const not = this.negate ? 'NOT ' : '';
-    const sign = operator.description;
-    const query = select.build(true);
-    const condition = `${not}${this.column} ${sign} ANY (${query})`;
 
-    this.values.push(...select.get.values());
-    this.stack.push(condition);
+    this.stack.push(`${not}${this.column} = ?`);
+    this.values.push(false);
+
     this.negate = false;
-
     return this;
   }
 
   /**
-   * Checks if the column value satisfies a condition when compared to all results from a subquery.
-   * Use this method when you need to check if a column value satisfies a condition for all results
-   * from a subquery.
+   * Adds a condition checking if the column is truthy (equals `true`).
    *
-   * @param operator The operator (e.g., `EQUAL`, `LESS`, `MORE`, etc.) to use in the comparison.
-   * @param subquery A function that receives a `Select` instance, which you can use to build the subquery.
-   * @throws `QueryError` if the operator is invalid or the subquery is not a valid function.
-   * @returns The `Condition` instance for chaining further query conditions.
+   * @throws `QueryError` if the column name is invalid or empty.
+   * @returns The current query instance (`this`) for chaining.
    */
-  public all(operator: Operator, subquery: (select: Select) => void): this {
+  public isTrue(): this {
     if (!isFullStr(this.column)) {
       throw new QueryError(`Invalid column: ${String(this.column)}`);
     }
 
-    if (invalidOperator(operator)) {
-      throw new QueryError(`Invalid operator: ${String(operator)}`);
-    }
-
-    if (!isFunc(subquery)) {
-      throw new QueryError(`Invalid subquery: ${String(subquery)}`);
-    }
-
-    const select = new Select(this.query.connection);
-
-    subquery(select); // build the query
-
     const not = this.negate ? 'NOT ' : '';
-    const sign = operator.description;
-    const query = select.build(true);
-    const condition = `${not}${this.column} ${sign} ALL (${query})`;
 
-    this.values.push(...select.get.values());
-    this.stack.push(condition);
-    this.negate = false;
+    this.stack.push(`${not}${this.column} = ?`);
+    this.values.push(true);
 
+    this.negate = true;
     return this;
   }
 }

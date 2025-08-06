@@ -1,5 +1,14 @@
-import { Faker, isChildOf, isInt, isObj, isSnakeCase } from '../../helpers';
+import {
+  Faker,
+  isChildOf,
+  isInt,
+  isObj,
+  isSnakeCase,
+  isStr,
+} from '../../helpers';
 import { Builder } from './Builder';
+import { Row } from './Driver';
+import { Mixer } from '../../helpers/Mixer';
 
 /**
  * Defines the type for the `get` property in `Seeder`, which provides access to various
@@ -33,6 +42,33 @@ type Getter = {
    * @throws `SeederError` if the faker is not a `Faker` instance.
    */
   faker: () => Faker;
+
+  /**
+   * Retrieves a cached `Mixer` instance by key for generating unique rows.
+   * @returns The mixer instance associated with the given key.
+   * @throws `SeederError` if the mixer is not a `Mixer` instance.
+   */
+  mixer: (key: string) => Mixer;
+
+  /**
+   * Retrieves the current row index number.
+   * @returns The current row index number starting from 0.
+   */
+  index: () => number;
+
+  /**
+   * Retrieves the current row number.
+   * @returns The current row number starting from 1.
+   */
+  row: () => number;
+
+  /**
+   * Returns the total number of possible unique combinations
+   * across all registered mixers.
+   *
+   * @returns The total count of possible unique rows.
+   */
+  size: () => number;
 };
 
 /**
@@ -114,6 +150,21 @@ export abstract class Seeder {
   private faker = new Faker();
 
   /**
+   * Current row number (starting from 1)
+   */
+  private row: number;
+
+  /**
+   * Current row index number (starting from 0)
+   */
+  private index: number;
+
+  /**
+   * Current row index number (starting from 0)
+   */
+  private mixers: Map<string, Mixer> = new Map();
+
+  /**
    * Provides setter functions for configuring properties of the `Seeder` instance,
    * including `table`, `rows`, `builder`, and `faker`.
    */
@@ -129,7 +180,7 @@ export abstract class Seeder {
       return this;
     },
     rows: (rows: number): this => {
-      if (!isInt(rows) || rows <= 0) {
+      if (!isInt(rows) || rows < 0) {
         throw new SeederError(
           `Invalid rows number in: ${this.constructor.name}`
         );
@@ -161,6 +212,17 @@ export abstract class Seeder {
    * including `table`, `rows`, `builder`, and `faker`.
    */
   public get: Getter = {
+    mixer: (key: string): Mixer => {
+      if (!isStr(key)) {
+        throw new SeederError(`Invalid mixer key in: ${this.constructor.name}`);
+      }
+
+      if (this.mixers.has(key)) return this.mixers.get(key);
+
+      const mixer = new Mixer();
+      this.mixers.set(key, mixer);
+      return mixer;
+    },
     table: (): string => {
       if (!isSnakeCase(this.table)) {
         throw new SeederError(
@@ -171,7 +233,7 @@ export abstract class Seeder {
       return this.table;
     },
     rows: (): number => {
-      if (!isInt(this.rows) || this.rows <= 0) {
+      if (!isInt(this.rows) || this.rows < 0) {
         throw new SeederError(
           `Invalid rows number in: ${this.constructor.name}`
         );
@@ -192,6 +254,23 @@ export abstract class Seeder {
       }
 
       return this.faker;
+    },
+    index: (): number => {
+      return this.index || 0;
+    },
+    row: (): number => {
+      return this.row || 1;
+    },
+    size: (...keys: string[]): number => {
+      const mixers = keys.length
+        ? keys.map((k) => this.mixers.get(k)).filter((m) => Boolean(m))
+        : [...this.mixers.values()];
+
+      let total = 0;
+
+      for (const mixer of mixers) total += mixer.size();
+
+      return total;
     },
   };
 
@@ -223,9 +302,14 @@ export abstract class Seeder {
    */
   public seed(): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (this.get.rows() <= 0) return resolve();
+
       const rows = [];
 
       for (let index = 0; index < this.get.rows(); index++) {
+        this.index = index;
+        this.row = index + 1;
+
         const layout = this.layout();
 
         if (!isObj(layout)) {
@@ -237,12 +321,14 @@ export abstract class Seeder {
         rows.push(layout);
       }
 
-      const insert = this.get.builder().insert<void>().into(this.get.table());
-
-      if (rows.length === 1) insert.row(rows[0]);
-      else insert.rows(rows);
-
-      return insert.exec().then(resolve).catch(reject);
+      return this.get
+        .builder()
+        .insert()
+        .into(this.get.table())
+        .rows(rows)
+        .exec()
+        .then(resolve)
+        .catch(reject);
     });
   }
 
@@ -279,5 +365,25 @@ export abstract class Seeder {
     throw new SeederError(
       `Seeder layout is missing in: ${this.constructor.name}`
     );
+  }
+
+  /**
+   * Consumes the next available row from the specified mixers.
+   * If no keys are provided, consumes from all mixers.
+   *
+   * @param keys Optional array of mixer keys to consume from.
+   * @returns The next available Row from the specified mixers.
+   * @throws SeederError if no mixers have available rows.
+   */
+  protected consume(...keys: string[]): Row {
+    const mixersToUse = keys.length
+      ? keys.map((k) => this.mixers.get(k)).filter(Boolean)
+      : [...this.mixers.values()];
+
+    for (const mixer of mixersToUse) {
+      if (mixer.ready()) return mixer.get();
+    }
+
+    throw new SeederError('No more rows available from mixers');
   }
 }

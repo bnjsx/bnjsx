@@ -132,7 +132,10 @@ export interface PoolConnection {
    *
    * @note This method resolves with `Rows` in SELECT queries, otherwise `undefined` for other query types.
    */
-  query(sql: string, values?: Array<string | number>): Promise<QueryResult>;
+  query(
+    sql: string,
+    values?: Array<string | number | boolean>
+  ): Promise<QueryResult>;
 
   /**
    * Starts a new transaction on the database connection.
@@ -913,7 +916,7 @@ export class Pool extends EventEmitter {
    */
   public query(
     sql: string,
-    values?: Array<string | number>
+    values?: Array<string | number | boolean>
   ): Promise<QueryResult> {
     return new Promise((resolve, reject) => {
       this.request()

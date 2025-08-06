@@ -15,7 +15,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'GET',
-        pattern: /^\/$/,
+        pattern: /^\/\/?$/,
         middlewares: [middleware],
       });
     });
@@ -37,7 +37,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'GET',
-        pattern: /^\/user(?:\/([^\/]+))(?:\/([^\/]+))$/,
+        pattern: /^\/user(?:\/([^\/]+))(?:\/([^\/]+))\/?$/,
         params: ['name', 'age'],
         middlewares: [middleware],
       });
@@ -49,7 +49,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'GET',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware, middleware],
       });
     });
@@ -80,7 +80,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'GET',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -93,7 +93,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'POST',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -106,7 +106,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'PUT',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -119,7 +119,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'DELETE',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -132,7 +132,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'PATCH',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -145,7 +145,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'OPTIONS',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -158,7 +158,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: 'HEAD',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });
@@ -171,7 +171,7 @@ describe('Router', () => {
       expect(router.routes).toHaveLength(1);
       expect(router.routes[0]).toEqual({
         method: '*',
-        pattern: /^\/users$/,
+        pattern: /^\/users\/?$/,
         middlewares: [middleware],
       });
     });

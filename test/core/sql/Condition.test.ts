@@ -1,4 +1,5 @@
-import { Select } from '../../../src/core';
+import { config } from '../../../src/config';
+import { Driver, Select } from '../../../src/core';
 import { Condition, ref } from '../../../src/core';
 
 import {
@@ -12,15 +13,6 @@ import {
   exSecond,
 } from '../../../src/core';
 
-import {
-  EQUAL,
-  LESS,
-  LESS_OR_EQUAL,
-  MORE,
-  MORE_OR_EQUAL,
-  NOT_EQUAL,
-} from '../../../src/core';
-
 import { QueryError } from '../../../src/errors';
 
 const mock = {
@@ -32,13 +24,13 @@ const mock = {
     } as any;
   },
   mysql: () => {
-    return { id: Symbol('MySQL') };
+    return { id: Symbol('MySQL') } as any as Driver;
   },
   sqlite: () => {
-    return { id: Symbol('SQLite') };
+    return { id: Symbol('SQLite') } as any as Driver;
   },
   pg: () => {
-    return { id: Symbol('PostgreSQL') };
+    return { id: Symbol('PostgreSQL') } as any as Driver;
   },
   query: () => new Select(mock.connection()),
 };
@@ -66,222 +58,204 @@ describe('exDate', () => {
 });
 
 describe('exTime', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should hanlde MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exTime('created_at', con)).toBe('TIME(created_at)');
+    expect(exTime('created_at', driver)).toBe('TIME(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exTime('created_at', con)).toBe("TO_CHAR(created_at, 'HH24:MI:SS')");
+    expect(exTime('created_at', driver)).toBe(
+      "TO_CHAR(created_at, 'HH24:MI:SS')"
+    );
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exTime('created_at', con)).toBe("STRFTIME('%H:%M:%S', created_at)");
+    expect(exTime('created_at', driver)).toBe(
+      "STRFTIME('%H:%M:%S', created_at)"
+    );
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exTime(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exTime('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exTime(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('exYear', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should handle MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exYear('created_at', con)).toBe('YEAR(created_at)');
+    expect(exYear('created_at', driver)).toBe('YEAR(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exYear('created_at', con)).toBe('EXTRACT(YEAR FROM created_at)');
+    expect(exYear('created_at', driver)).toBe('EXTRACT(YEAR FROM created_at)');
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exYear('created_at', con)).toBe("STRFTIME('%Y', created_at)");
+    expect(exYear('created_at', driver)).toBe("STRFTIME('%Y', created_at)");
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exYear(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exYear('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exYear(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('exMonth', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should handle MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exMonth('created_at', con)).toBe('MONTH(created_at)');
+    expect(exMonth('created_at', driver)).toBe('MONTH(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exMonth('created_at', con)).toBe('EXTRACT(MONTH FROM created_at)');
+    expect(exMonth('created_at', driver)).toBe(
+      'EXTRACT(MONTH FROM created_at)'
+    );
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exMonth('created_at', con)).toBe("STRFTIME('%m', created_at)");
+    expect(exMonth('created_at', driver)).toBe("STRFTIME('%m', created_at)");
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exMonth(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exMonth('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exMonth(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('exDay', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should handle MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exDay('created_at', con)).toBe('DAY(created_at)');
+    expect(exDay('created_at', driver)).toBe('DAY(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exDay('created_at', con)).toBe('EXTRACT(DAY FROM created_at)');
+    expect(exDay('created_at', driver)).toBe('EXTRACT(DAY FROM created_at)');
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exDay('created_at', con)).toBe("STRFTIME('%d', created_at)");
+    expect(exDay('created_at', driver)).toBe("STRFTIME('%d', created_at)");
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exDay(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exDay('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exDay(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('exHour', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should handle MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exHour('created_at', con)).toBe('HOUR(created_at)');
+    expect(exHour('created_at', driver)).toBe('HOUR(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exHour('created_at', con)).toBe('EXTRACT(HOUR FROM created_at)');
+    expect(exHour('created_at', driver)).toBe('EXTRACT(HOUR FROM created_at)');
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exHour('created_at', con)).toBe("STRFTIME('%H', created_at)");
+    expect(exHour('created_at', driver)).toBe("STRFTIME('%H', created_at)");
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exHour(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exHour('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exHour(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('exMinute', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should handle MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exMinute('created_at', con)).toBe('MINUTE(created_at)');
+    expect(exMinute('created_at', driver)).toBe('MINUTE(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exMinute('created_at', con)).toBe('EXTRACT(MINUTE FROM created_at)');
+    expect(exMinute('created_at', driver)).toBe(
+      'EXTRACT(MINUTE FROM created_at)'
+    );
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exMinute('created_at', con)).toBe("STRFTIME('%M', created_at)");
+    expect(exMinute('created_at', driver)).toBe("STRFTIME('%M', created_at)");
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exMinute(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exMinute('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exMinute(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('exSecond', () => {
-  const con = mock.connection();
+  const driver = mock.mysql();
 
   test('should handle MySQL', () => {
-    con.driver = mock.mysql();
+    const driver = mock.mysql();
 
-    expect(exSecond('created_at', con)).toBe('SECOND(created_at)');
+    expect(exSecond('created_at', driver)).toBe('SECOND(created_at)');
   });
 
   test('should handle PostgreSQL', () => {
-    con.driver = mock.pg();
+    const driver = mock.pg();
 
-    expect(exSecond('created_at', con)).toBe('EXTRACT(SECOND FROM created_at)');
+    expect(exSecond('created_at', driver)).toBe(
+      'EXTRACT(SECOND FROM created_at)'
+    );
   });
 
   test('should handle SQLite', () => {
-    con.driver = mock.sqlite();
+    const driver = mock.sqlite();
 
-    expect(exSecond('created_at', con)).toBe("STRFTIME('%S', created_at)");
+    expect(exSecond('created_at', driver)).toBe("STRFTIME('%S', created_at)");
   });
 
   test('should throw QueryError for invalid column', () => {
-    expect(() => exSecond(123 as any, con)).toThrow(QueryError);
-  });
-
-  test('should throw QueryError for invalid connection', () => {
-    expect(() => exSecond('created_at', {} as any)).toThrow(QueryError);
+    expect(() => exSecond(123 as any, driver)).toThrow(QueryError);
   });
 });
 
 describe('Condition', () => {
   let condition: any;
-  let query: Select;
+  let driver: Driver;
 
   beforeEach(() => {
-    query = mock.query();
-    condition = new Condition(query);
+    driver = mock.connection().driver;
+    condition = new Condition(driver);
 
     jest.resetAllMocks();
   });
@@ -292,7 +266,7 @@ describe('Condition', () => {
     });
 
     it('should initialize correctly with a valid query instance', () => {
-      expect(new Condition(query)).toBeInstanceOf(Condition);
+      expect(new Condition(driver)).toBeInstanceOf(Condition);
     });
   });
 
@@ -300,67 +274,6 @@ describe('Condition', () => {
     test('should return the valid condition string', () => {
       condition.col('age').greaterThan(18).and().col('status').equal('active');
       expect(condition.build()).toBe('age > ? AND status = ?');
-    });
-
-    test('should throw an error for unmatched parentheses', () => {
-      condition.col('age').greaterThan(18).open();
-      expect(() => condition.build()).toThrow(
-        new QueryError('Syntax error: Unmatched parentheses.')
-      );
-    });
-
-    test('should throw an error for AND/OR following an opening parenthesis', () => {
-      condition.open().and().col('age').equal(18).close();
-      expect(() => condition.build()).toThrow(
-        new QueryError(
-          'Invalid syntax: AND/OR cannot directly follow an opening parenthesis.'
-        )
-      );
-    });
-
-    test('should throw an error for AND/OR preceding a closing parenthesis', () => {
-      condition.open().col('age').equal(18).and().close();
-      expect(() => condition.build()).toThrow(
-        new QueryError(
-          'Invalid syntax: AND/OR cannot directly precede a closing parenthesis.'
-        )
-      );
-    });
-
-    test('should throw an error for consecutive AND/OR operators', () => {
-      condition.col('age').equal(18).and().and().col('status').equal('active');
-      expect(() => condition.build()).toThrow(
-        new QueryError('Invalid syntax: Consecutive AND/OR operators found.')
-      );
-    });
-
-    test('should throw an error for empty parentheses', () => {
-      condition.open().close().col('status').equal('active');
-      expect(() => condition.build()).toThrow(
-        new QueryError('Invalid syntax: Empty parentheses found.')
-      );
-    });
-
-    test('should throw an error if condition ends with AND/OR', () => {
-      condition.col('age').equal(18).and();
-      expect(() => condition.build()).toThrow(
-        new QueryError('Invalid syntax: Condition cannot end with an operator.')
-      );
-    });
-
-    test('should throw an error if condition starts with AND/OR', () => {
-      condition.and().col('age').equal(18);
-      expect(() => condition.build()).toThrow(
-        new QueryError(
-          'Invalid syntax: Condition cannot start with an operator.'
-        )
-      );
-    });
-
-    test('should throw an error if condition string is empty', () => {
-      expect(() => condition.build()).toThrow(
-        new QueryError('Invalid syntax: Condition cannot be empty.')
-      );
     });
   });
 
@@ -380,12 +293,6 @@ describe('Condition', () => {
     test('should throw an error if condition is not a string', () => {
       expect(() => condition.raw(123 as any)).toThrow(
         new QueryError('Invalid condition: 123')
-      );
-    });
-
-    test('should throw an error for invalid value types in the values array', () => {
-      expect(() => condition.raw('age > ?', null, {})).toThrow(
-        new QueryError('Invalid condition value: null')
       );
     });
 
@@ -485,7 +392,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use a MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inTime('15:30:00');
       expect(condition.stack).toContain('TIME(created_at) = ?');
@@ -496,7 +403,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use an PostgreSQL driver
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inTime('15:30:00');
       expect(condition.stack).toContain(
@@ -509,7 +416,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use an SQLite driver
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inTime('15:30:00');
       expect(condition.stack).toContain("STRFTIME('%H:%M:%S', created_at) = ?");
@@ -520,7 +427,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use a MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inTime(ref('orders.time'));
       expect(condition.stack).toContain('TIME(created_at) = orders.time');
@@ -539,7 +446,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTEST.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inTime('15:30:00');
@@ -557,7 +464,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inYear(2023);
       expect(condition.stack).toContain('YEAR(created_at) = ?');
@@ -568,7 +475,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use PostgreSQL driver
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inYear(2023);
       expect(condition.stack).toContain('EXTRACT(YEAR FROM created_at) = ?');
@@ -579,7 +486,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use SQLite driver
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inYear(2023);
       expect(condition.stack).toContain("STRFTIME('%Y', created_at) = ?");
@@ -590,7 +497,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inYear(ref('orders.year'));
       expect(condition.stack).toContain('YEAR(created_at) = orders.year');
@@ -617,7 +524,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTest.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inYear(2023);
@@ -635,7 +542,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inMonth(5); // May
       expect(condition.stack).toContain('MONTH(created_at) = ?');
@@ -646,7 +553,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use PostgreSQL driver
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inMonth(5); // May
       expect(condition.stack).toContain('EXTRACT(MONTH FROM created_at) = ?');
@@ -657,7 +564,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use SQLite driver
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inMonth(5); // May
       expect(condition.stack).toContain("STRFTIME('%m', created_at) = ?");
@@ -668,7 +575,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inMonth(ref('orders.month')); // May
       expect(condition.stack).toContain('MONTH(created_at) = orders.month');
@@ -695,7 +602,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTest.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inMonth(5);
@@ -713,7 +620,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inDay(15); // 15th day of the month
       expect(condition.stack).toContain('DAY(created_at) = ?');
@@ -724,7 +631,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use PostgreSQL driver
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inDay(15); // 15th day of the month
       expect(condition.stack).toContain('EXTRACT(DAY FROM created_at) = ?');
@@ -735,7 +642,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use SQLite driver
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inDay(15); // 15th day of the month
       expect(condition.stack).toContain("STRFTIME('%d', created_at) = ?");
@@ -746,7 +653,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Use MySQL driver
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inDay(ref('orders.day')); // May
       expect(condition.stack).toContain('DAY(created_at) = orders.day');
@@ -771,7 +678,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTest.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inDay(15);
@@ -787,7 +694,7 @@ describe('Condition', () => {
   describe('inHour', () => {
     test('should add a valid hour comparison condition for MySQL', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inHour(12);
 
@@ -797,7 +704,7 @@ describe('Condition', () => {
 
     test('should add a valid hour comparison condition for PostgreSQL', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inHour(12);
 
@@ -807,7 +714,7 @@ describe('Condition', () => {
 
     test('should add a valid hour comparison condition for SQLite', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inHour(12);
 
@@ -817,7 +724,7 @@ describe('Condition', () => {
 
     test('should add a valid hour comparison condition with a reference', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inHour(ref('orders.hour'));
 
@@ -845,7 +752,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTest.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inHour(15);
@@ -861,7 +768,7 @@ describe('Condition', () => {
   describe('inMinute', () => {
     test('should add a valid minute comparison condition for MySQL', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inMinute(34);
 
@@ -871,7 +778,7 @@ describe('Condition', () => {
 
     test('should add a valid minute comparison condition for PostgreSQL', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inMinute(34);
 
@@ -881,7 +788,7 @@ describe('Condition', () => {
 
     test('should add a valid minute comparison condition for SQLite', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inMinute(34);
 
@@ -892,7 +799,7 @@ describe('Condition', () => {
     test('should add a valid minute comparison condition with a reference', () => {
       condition.column = 'created_at';
 
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inMinute(ref('orders.minute'));
 
@@ -920,7 +827,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTest.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inMinute(15);
@@ -936,7 +843,7 @@ describe('Condition', () => {
   describe('inSecond', () => {
     test('should add a valid second comparison condition for MySQL', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inSecond(56);
 
@@ -946,7 +853,7 @@ describe('Condition', () => {
 
     test('should add a valid second comparison condition for PostgreSQL', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.pg();
+      condition.driver = mock.pg();
 
       condition.inSecond(56);
 
@@ -956,7 +863,7 @@ describe('Condition', () => {
 
     test('should add a valid second comparison condition for SQLite', () => {
       condition.column = 'created_at';
-      condition.query.connection.driver = mock.sqlite();
+      condition.driver = mock.sqlite();
 
       condition.inSecond(56);
 
@@ -967,7 +874,7 @@ describe('Condition', () => {
     test('should add a valid second comparison condition with a reference', () => {
       condition.column = 'created_at';
 
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.inSecond(ref('orders.second'));
 
@@ -995,7 +902,7 @@ describe('Condition', () => {
       condition.column = 'created_at';
 
       // Spy on ORMTest.is.mysql
-      condition.query.connection.driver = mock.mysql();
+      condition.driver = mock.mysql();
 
       condition.negate = true;
       condition.inSecond(15);
@@ -1015,6 +922,12 @@ describe('Condition', () => {
       expect(condition.values).toEqual([30]);
     });
 
+    it('should support null values', () => {
+      const query = condition.col('age').equal(null).build();
+      expect(query).toBe('age IS NULL');
+      expect(condition.values).toEqual([]);
+    });
+
     it('should generate the correct equality condition with a reference', () => {
       const query = condition
         .col('users.id')
@@ -1027,12 +940,6 @@ describe('Condition', () => {
     it('should generate the correct equality condition for strings', () => {
       const query = condition.col('username').equal('JohnDoe').build();
       expect(query).toBe('username = ?');
-    });
-
-    it('should throw an error for invalid value type', () => {
-      expect(() => condition.col('age').equal(undefined).build()).toThrow(
-        QueryError
-      );
     });
 
     it('should throw an error for invalid column name', () => {
@@ -1066,12 +973,6 @@ describe('Condition', () => {
       expect(condition.values).toEqual([]);
     });
 
-    it('should throw an error for invalid value type', () => {
-      expect(() => condition.col('price').lessThan(undefined).build()).toThrow(
-        QueryError
-      );
-    });
-
     it('should throw an error for invalid column name', () => {
       expect(() => condition.lessThan(100).build()).toThrow(QueryError);
     });
@@ -1101,12 +1002,6 @@ describe('Condition', () => {
         condition.col('stock').lessThanOrEqual(ref('table.column')).build()
       ).toBe('stock <= table.column');
       expect(condition.values).toEqual([]);
-    });
-
-    it('should throw an error for invalid value type', () => {
-      expect(() =>
-        condition.col('stock').lessThanOrEqual(undefined).build()
-      ).toThrow(QueryError);
     });
 
     it('should throw an error for invalid column name', () => {
@@ -1140,12 +1035,6 @@ describe('Condition', () => {
       expect(condition.values).toEqual([]);
     });
 
-    it('should throw an error for invalid value type', () => {
-      expect(() =>
-        condition.col('salary').greaterThan(undefined).build()
-      ).toThrow(QueryError);
-    });
-
     it('should throw an error for invalid column name', () => {
       expect(() => condition.greaterThan(50000).build()).toThrow(QueryError);
     });
@@ -1177,12 +1066,6 @@ describe('Condition', () => {
       ).toBe('age >= table.column');
 
       expect(condition.values).toEqual([]);
-    });
-
-    it('should throw an error for invalid value type', () => {
-      expect(() =>
-        condition.col('age').greaterThanOrEqual(undefined).build()
-      ).toThrow(QueryError);
     });
 
     it('should throw an error for invalid column name', () => {
@@ -1276,12 +1159,6 @@ describe('Condition', () => {
       }).toThrow(new QueryError('Values array cannot be empty for IN clause'));
     });
 
-    it('should throw an error if one of the values is invalid', () => {
-      expect(() => {
-        condition.col('status').in(1, 'active', {}).build();
-      }).toThrow(new QueryError('Invalid value: [object Object]'));
-    });
-
     it('should throw an error for invalid column name', () => {
       expect(() => condition.in([30, 123]).build()).toThrow(QueryError);
     });
@@ -1293,49 +1170,6 @@ describe('Condition', () => {
         .in('active', 'pending', 'inactive')
         .build();
       expect(query).toBe('NOT status IN (?, ?, ?)');
-    });
-  });
-
-  describe('inSubquery', () => {
-    it('should generate the correct IN condition with a subquery', () => {
-      const subquery = (select) => {
-        select
-          .col('id')
-          .from('users')
-          .where((col) => col('status').equal('active'));
-      };
-
-      const query = condition.col('user_id').inSubquery(subquery).build();
-      expect(query).toBe('user_id IN (SELECT id FROM users WHERE status = ?)');
-      expect(condition.values).toEqual(['active']);
-    });
-
-    it('should throw an error if the subquery is not a function', () => {
-      expect(() => {
-        condition.col('user_id').inSubquery('not a function').build();
-      }).toThrow(new QueryError('Invalid subquery: not a function'));
-    });
-
-    it('should throw an error for invalid column name', () => {
-      expect(() => {
-        condition.inSubquery(() => {}).build();
-      }).toThrow(QueryError);
-    });
-
-    it('should handle the NOT condition for inSubquery', () => {
-      const query = condition
-        .col('user_id')
-        .not()
-        .inSubquery((select) => {
-          select
-            .col('id')
-            .from('users')
-            .where((col) => col('status').equal('active'));
-        })
-        .build();
-      expect(query).toBe(
-        'NOT user_id IN (SELECT id FROM users WHERE status = ?)'
-      );
     });
   });
 
@@ -1393,176 +1227,42 @@ describe('Condition', () => {
     });
   });
 
-  describe('exists', () => {
-    it('should generate the correct EXISTS condition for a subquery', () => {
-      const subquery = (select) => {
-        select.from('users').where((col) => col('status').equal('active'));
-      };
-
-      const query = condition.col('user_id').exists(subquery).build();
-      expect(query).toBe('EXISTS (SELECT * FROM users WHERE status = ?)');
-      expect(condition.values).toEqual(['active']);
+  describe('isTrue', () => {
+    it('should generate the correct condition', () => {
+      const query = condition.col('has_email').isTrue().build();
+      expect(query).toBe('has_email = ?');
+      expect(condition.values).toEqual([true]); // No values for IS NULL
     });
 
-    it('should handle the NOT EXISTS condition when negated', () => {
-      const subquery = (select) => {
-        select.from('users').where((col) => col('status').equal('inactive'));
-      };
-
-      const query = condition.col('user_id').not().exists(subquery).build();
-      expect(query).toBe('NOT EXISTS (SELECT * FROM users WHERE status = ?)');
-      expect(condition.values).toEqual(['inactive']);
-    });
-
-    it('should throw an error if the subquery is not a function', () => {
-      expect(() => {
-        condition.col('user_id').exists('not a function').build();
-      }).toThrow(new QueryError('Invalid subquery: not a function'));
-    });
-  });
-
-  describe('any', () => {
-    it('should generate the correct ANY condition for a subquery', () => {
-      const subquery = (select) => {
-        select.col('age').from('users');
-      };
-
-      const query = condition.col('age').any(MORE, subquery).build();
-      expect(query).toBe('age > ANY (SELECT age FROM users)');
-      expect(condition.values).toEqual([]);
-    });
-
-    it('should handle the NOT ANY condition when negated', () => {
-      const subquery = (select) => {
-        select.col('age').from('users');
-      };
-
-      const query = condition.col('age').not().any(MORE, subquery).build();
-      expect(query).toBe('NOT age > ANY (SELECT age FROM users)');
-    });
-
-    it('should throw an error if the operator is invalid', () => {
-      const subquery = (select) => {
-        select.col('age').from('users');
-      };
-
-      expect(() => {
-        condition.col('age').any('invalid_operator', subquery).build();
-      }).toThrow(new QueryError('Invalid operator: invalid_operator'));
-
-      expect(() => {
-        condition.col('age').any(Symbol('hi'), subquery).build();
-      }).toThrow(new QueryError('Invalid operator: Symbol(hi)'));
-    });
-
-    it('should throw an error if the subquery is not a function', () => {
-      expect(() => {
-        condition.col('age').any(LESS, 'not a function').build();
-      }).toThrow(new QueryError('Invalid subquery: not a function'));
+    it('should handle the NOT condition when negated', () => {
+      const query = condition.col('has_email').not().isTrue().build();
+      expect(query).toBe('NOT has_email = ?');
+      expect(condition.values).toEqual([true]); // No values for IS NULL
     });
 
     it('should throw an error for invalid column name', () => {
       expect(() => {
-        condition.any(LESS, (select) => {}).build();
+        condition.isTrue().build();
       }).toThrow(QueryError);
     });
-
-    it('should reference subquery values', () => {
-      // get the name of the first user
-      const subquery = (select: Select) =>
-        select
-          .col('name')
-          .from('users')
-          .where((col) => col('id').equal(1));
-
-      // get all active users with the same name
-      expect(
-        condition
-          .col('status')
-          .equal('active')
-          .and()
-          .col('name')
-          .any(EQUAL, subquery)
-          .build()
-      ).toBe('status = ? AND name = ANY (SELECT name FROM users WHERE id = ?)');
-
-      expect(condition.values).toEqual(['active', 1]);
-    });
   });
 
-  describe('all', () => {
-    it('should generate the correct ALL condition for a subquery', () => {
-      const subquery = (select) => {
-        select
-          .col('age')
-          .from('users')
-          .where((col) => col('id').equal(1));
-      };
-
-      expect(
-        new Condition(mock.query()).col('age').all(MORE, subquery).build()
-      ).toBe('age > ALL (SELECT age FROM users WHERE id = ?)');
-
-      expect(
-        new Condition(mock.query()).col('age').all(LESS, subquery).build()
-      ).toBe('age < ALL (SELECT age FROM users WHERE id = ?)');
-
-      expect(
-        new Condition(mock.query())
-          .col('age')
-          .all(MORE_OR_EQUAL, subquery)
-          .build()
-      ).toBe('age >= ALL (SELECT age FROM users WHERE id = ?)');
-
-      expect(
-        new Condition(mock.query())
-          .col('age')
-          .all(LESS_OR_EQUAL, subquery)
-          .build()
-      ).toBe('age <= ALL (SELECT age FROM users WHERE id = ?)');
-
-      expect(
-        new Condition(mock.query()).col('age').all(EQUAL, subquery).build()
-      ).toBe('age = ALL (SELECT age FROM users WHERE id = ?)');
-
-      expect(
-        new Condition(mock.query()).col('age').all(NOT_EQUAL, subquery).build()
-      ).toBe('age != ALL (SELECT age FROM users WHERE id = ?)');
+  describe('isFalse', () => {
+    it('should generate the correct condition', () => {
+      const query = condition.col('has_email').isFalse().build();
+      expect(query).toBe('has_email = ?');
+      expect(condition.values).toEqual([false]); // No values for IS NULL
     });
 
-    it('should handle the NOT ALL condition when negated', () => {
-      const subquery = (select) => {
-        select.col('age').from('users');
-      };
-
-      expect(condition.col('age').not().all(EQUAL, subquery).build()).toBe(
-        'NOT age = ALL (SELECT age FROM users)'
-      );
-    });
-
-    it('should throw an error if the operator is invalid', () => {
-      const subquery = (select) => {
-        select.col('age').from('users');
-      };
-
-      expect(() => {
-        condition.col('age').all('invalid_operator', subquery).build();
-      }).toThrow(new QueryError('Invalid operator: invalid_operator'));
-
-      expect(() => {
-        condition.col('age').all(Symbol('hi'), subquery).build();
-      }).toThrow(new QueryError('Invalid operator: Symbol(hi)'));
-    });
-
-    it('should throw an error if the subquery is not a function', () => {
-      expect(() => {
-        condition.col('age').all(LESS, 'not a function').build();
-      }).toThrow(new QueryError('Invalid subquery: not a function'));
+    it('should handle the NOT condition when negated', () => {
+      const query = condition.col('has_email').not().isFalse().build();
+      expect(query).toBe('NOT has_email = ?');
+      expect(condition.values).toEqual([false]); // No values for IS NULL
     });
 
     it('should throw an error for invalid column name', () => {
       expect(() => {
-        condition.all(LESS, (select) => {}).build();
+        condition.isFalse().build();
       }).toThrow(QueryError);
     });
   });

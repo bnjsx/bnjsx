@@ -19,11 +19,17 @@ jest.mock('../../../src/core/template/Component', () => ({
 
 import '../../../src/core/modules/Response';
 import * as fs from 'fs/promises';
-import { ResponseError } from '../../../src/core';
-import { ServerResponse } from 'http';
+import {
+  FLASH_GET_KEY,
+  FLASH_SET_KEY,
+  Redirector,
+  ResponseError,
+} from '../../../src/core';
+import { IncomingMessage, ServerResponse } from 'http';
 import { NotFoundError } from '../../../src/errors';
 import { createReadStream, ReadStream } from 'fs';
 import { render } from '../../../src/core';
+import { UTC } from '../../../src/helpers';
 
 describe('Response', () => {
   let res: any;
@@ -32,9 +38,10 @@ describe('Response', () => {
     res = Object.create(ServerResponse.prototype); // Create a fresh instance
     res.end = jest.fn((data, callback) => callback && callback());
     res.setHeader = jest.fn();
+    res.getHeader = jest.fn();
     res.clearHeader = jest.fn();
     res.hasHeader = jest.fn(() => false);
-
+    res.setCooke;
     // Override writableEnded using defineProperty
     Object.defineProperty(res, 'writableEnded', {
       value: false,
@@ -373,29 +380,6 @@ describe('Response', () => {
     });
   });
 
-  describe('redirect', () => {
-    beforeEach(() => {
-      res.status = jest.fn().mockReturnThis();
-      res.send = jest.fn().mockResolvedValue(undefined);
-    });
-
-    test('redirect should set Location header and send a 301 response', async () => {
-      await res.redirect('https://example.com');
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Location',
-        'https://example.com'
-      );
-      expect(res.status).toHaveBeenCalledWith(301);
-      expect(res.send).toHaveBeenCalled();
-    });
-
-    test('redirect should reject if URL is not a string', async () => {
-      await expect(res.redirect(null as any)).rejects.toThrow(ResponseError);
-      await expect(res.redirect(123 as any)).rejects.toThrow(ResponseError);
-    });
-  });
-
   describe('status', () => {
     beforeEach(() => {
       res.getMessage = jest.fn().mockReturnValue('Not Found');
@@ -429,6 +413,7 @@ describe('Response', () => {
   describe('render', () => {
     beforeEach(() => {
       res.send = jest.fn().mockResolvedValue(undefined);
+      res.request = {};
     });
 
     test('render should call render function and send HTML content', async () => {
@@ -436,15 +421,65 @@ describe('Response', () => {
 
       await res.render('component.fx', {}, { name: 'John' });
 
-      expect(render).toHaveBeenCalledWith('component.fx', {}, { name: 'John' });
+      expect(render).toHaveBeenCalledWith(
+        'component.fx',
+        { flash: [] },
+        { name: 'John' }
+      );
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html');
       expect(res.send).toHaveBeenCalledWith('<h1>Hello, John!</h1>');
+    });
+
+    test('render should include csrf and merge flash messages', async () => {
+      (render as jest.Mock).mockResolvedValue('<html></html>');
+      res.request[FLASH_GET_KEY] = ['flash1'];
+      res.request.csrfToken = 'token123';
+
+      await res.render('view.fx', { flash: ['flash2'] }, {});
+
+      expect(render).toHaveBeenCalledWith(
+        'view.fx',
+        { flash: ['flash1', 'flash2'], csrf: 'token123' },
+        {}
+      );
     });
 
     test('render should reject on render failure', async () => {
       (render as jest.Mock).mockRejectedValue(new Error('Render failed'));
 
       await expect(res.render('component.fx')).rejects.toThrow('Render failed');
+    });
+  });
+
+  describe('html', () => {
+    beforeEach(() => {
+      res.setHeader = jest.fn();
+      res.send = jest.fn().mockResolvedValue(undefined);
+      res.request = {};
+    });
+
+    test('rejects if page is not a string', async () => {
+      await expect(res.html(null)).rejects.toThrow('Invalid html page');
+      await expect(res.html(123)).rejects.toThrow('Invalid html page');
+      expect(res.setHeader).not.toHaveBeenCalled();
+      expect(res.send).not.toHaveBeenCalled();
+    });
+
+    test('sets Content-Type header and sends page string', async () => {
+      await expect(res.html('<h1>Hello</h1>')).resolves.toBeUndefined();
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html');
+      expect(res.send).toHaveBeenCalledWith('<h1>Hello</h1>');
+    });
+
+    test('rejects if send rejects', async () => {
+      const error = new Error('Send failed');
+      res.send.mockRejectedValue(error);
+
+      await expect(res.html('<h1>Error</h1>')).rejects.toThrow('Send failed');
+
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html');
+      expect(res.send).toHaveBeenCalledWith('<h1>Error</h1>');
     });
   });
 
@@ -642,6 +677,34 @@ describe('Response', () => {
         'multi=test; Max-Age=3600; Domain=example.com; Path=/; Secure; HttpOnly; SameSite=Lax'
       );
     });
+
+    test('should append multiple cookies in Set-Cookie header as array', () => {
+      // First cookie sets header as string
+      res.cookie('first', '1');
+      expect(res.setHeader).toHaveBeenLastCalledWith('Set-Cookie', 'first=1');
+
+      // Mock getHeader to return the last set value (string)
+      (res.getHeader as jest.Mock).mockReturnValue('first=1');
+
+      // Second cookie should convert header to array
+      res.cookie('second', '2');
+      expect(res.setHeader).toHaveBeenLastCalledWith('Set-Cookie', [
+        'first=1',
+        'second=2',
+      ]);
+    });
+
+    test('should add cookies to existing Set-Cookie array header', () => {
+      // Mock getHeader to simulate existing array of cookies
+      (res.getHeader as jest.Mock).mockReturnValue(['first=1']);
+
+      res.cookie('second', '2');
+
+      expect(res.setHeader).toHaveBeenLastCalledWith('Set-Cookie', [
+        'first=1',
+        'second=2',
+      ]);
+    });
   });
 
   describe('clearCookie', () => {
@@ -700,6 +763,190 @@ describe('Response', () => {
       expect(res.setHeader).toHaveBeenCalledWith(
         'Set-Cookie',
         'token=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/secure; Domain=auth.com;'
+      );
+    });
+  });
+
+  describe('redirect', () => {
+    test('should return an instance of Redirector', () => {
+      const result = res.redirect('/somewhere');
+      expect(result).toBeInstanceOf(Redirector);
+    });
+  });
+});
+
+describe('Redirector', () => {
+  let req: any;
+  let res: any;
+  let redirect: Redirector;
+
+  beforeEach(() => {
+    req = Object.create(IncomingMessage.prototype);
+    req.headers = {};
+    req.getHeader = (key: string) => req.headers[key.toLowerCase()];
+    req[FLASH_SET_KEY] = [];
+
+    res = {
+      cookie: jest.fn(),
+      setHeader: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn().mockResolvedValue(undefined),
+    };
+
+    redirect = new Redirector(req, res);
+  });
+
+  describe('to', () => {
+    test('should set the redirect URL', () => {
+      const result = redirect.to('/dashboard');
+      expect(result).toBe(redirect);
+      expect((redirect as any).url).toBe('/dashboard');
+    });
+
+    test('should throw for non-string values', () => {
+      expect(() => redirect.to(null as any)).toThrow(ResponseError);
+      expect(() => redirect.to({} as any)).toThrow(ResponseError);
+    });
+  });
+
+  describe('back', () => {
+    test('should use referer header if available', () => {
+      req.headers['referer'] = 'https://example.com/profile?tab=posts';
+
+      const result = redirect.back('/fallback');
+      expect(result).toBe(redirect);
+      expect((redirect as any).url).toBe('/profile?tab=posts');
+    });
+
+    test('should fallback to provided path if referer is invalid', () => {
+      req.headers['referer'] = 'invalid://url';
+
+      redirect.back('/fallback');
+      expect((redirect as any).url).toBe('/fallback');
+    });
+
+    test('should fallback to "/" if no referer and no fallback given', () => {
+      delete req.headers['referer'];
+
+      redirect.back();
+      expect((redirect as any).url).toBe('/');
+    });
+
+    test('should support "referrer" fallback as well', () => {
+      req.headers['referrer'] = 'https://example.com/settings';
+      redirect.back();
+      expect((redirect as any).url).toBe('/settings');
+    });
+
+    test('should fallback if resulting URL is empty after parsing', () => {
+      // We'll simulate a case where the pathname is ''
+      req.headers['referer'] = 'http://'; // This results in a URL parse success but pathname = ''
+
+      redirect.back('/fallback');
+      expect((redirect as any).url).toBe('/fallback');
+    });
+  });
+
+  describe('send', () => {
+    test('should set location header and status, and call send()', async () => {
+      redirect.to('/next');
+
+      await redirect.send(301);
+
+      expect(res.setHeader).toHaveBeenCalledWith('Location', '/next');
+      expect(res.status).toHaveBeenCalledWith(301);
+      expect(res.send).toHaveBeenCalled();
+    });
+
+    test('should default to 302 and "/" if no url or code set', async () => {
+      await redirect.send();
+
+      expect(res.setHeader).toHaveBeenCalledWith('Location', '/');
+      expect(res.status).toHaveBeenCalledWith(302);
+      expect(res.send).toHaveBeenCalled();
+    });
+
+    test('should ignore non-integer status codes', async () => {
+      redirect.to('/somewhere');
+
+      await redirect.send('invalid' as any);
+      expect(res.status).toHaveBeenCalledWith(302); // fallback
+    });
+  });
+
+  describe('with', () => {
+    test('flash initializes and sets error message by default', () => {
+      req[FLASH_SET_KEY] = [];
+
+      redirect.with('Something went wrong');
+
+      expect(req[FLASH_SET_KEY]).toEqual([
+        { type: 'error', message: 'Something went wrong' },
+      ]);
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        'flash',
+        JSON.stringify([{ type: 'error', message: 'Something went wrong' }]),
+        expect.objectContaining({
+          path: '/',
+          httpOnly: true,
+          expires: UTC.future.minute(10),
+        })
+      );
+    });
+
+    test('flash sets custom type if provided', () => {
+      req[FLASH_SET_KEY] = [];
+
+      redirect.with('User created', 'success');
+
+      expect(req[FLASH_SET_KEY]).toEqual([
+        { type: 'success', message: 'User created' },
+      ]);
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        'flash',
+        JSON.stringify([{ type: 'success', message: 'User created' }]),
+        expect.any(Object)
+      );
+    });
+
+    test('flash appends multiple messages with correct types', () => {
+      req[FLASH_SET_KEY] = [];
+
+      redirect.with('First warning'); // default error
+      redirect.with('Now saved', 'success');
+      redirect.with('FYI', 'info');
+
+      expect(req[FLASH_SET_KEY]).toEqual([
+        { type: 'error', message: 'First warning' },
+        { type: 'success', message: 'Now saved' },
+        { type: 'info', message: 'FYI' },
+      ]);
+
+      expect(res.cookie).toHaveBeenLastCalledWith(
+        'flash',
+        JSON.stringify([
+          { type: 'error', message: 'First warning' },
+          { type: 'success', message: 'Now saved' },
+          { type: 'info', message: 'FYI' },
+        ]),
+        expect.any(Object)
+      );
+    });
+
+    test('flash initializes flash array if not present', () => {
+      delete req[FLASH_SET_KEY];
+
+      redirect.with('Init message');
+
+      expect(req[FLASH_SET_KEY]).toEqual([
+        { type: 'error', message: 'Init message' },
+      ]);
+      expect(res.cookie).toHaveBeenCalledWith(
+        'flash',
+        JSON.stringify([{ type: 'error', message: 'Init message' }]),
+        expect.any(Object)
       );
     });
   });

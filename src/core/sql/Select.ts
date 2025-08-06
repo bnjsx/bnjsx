@@ -72,7 +72,7 @@ export interface Pagination<R> {
 /**
  * Represents options for customizing the `count()` and `paginate()` methods.
  */
-type CountOptions = { column?: string; distinct?: boolean };
+export type CountOptions = { column?: string; distinct?: boolean };
 
 /**
  * Represents the internal state of a SELECT query, holding the settings and clauses used to build the SQL query.
@@ -360,7 +360,7 @@ export class Select extends Query<Rows> {
    */
   public paren(): this {
     if (isUndefined(this.state.where)) {
-      this.state.where = new Condition(this);
+      this.state.where = new Condition(this.connection.driver);
     }
 
     this.state.where.paren();
@@ -375,7 +375,7 @@ export class Select extends Query<Rows> {
    */
   public open(): this {
     if (isUndefined(this.state.where)) {
-      this.state.where = new Condition(this);
+      this.state.where = new Condition(this.connection.driver);
     }
 
     this.state.where.open();
@@ -490,9 +490,24 @@ export class Select extends Query<Rows> {
    *
    * @note You can chain multiple `join()` calls to join more than two tables in a single query result.
    */
-  public join(table: string, condition: (col: Col, con: Con) => void): this {
+  public join(table: string, condition: (col: Col, con: Con) => void): this;
+  public join(table: string, condition: Condition): this;
+  public join(
+    table: string,
+    condition: ((col: Col, con: Con) => void) | Condition
+  ): this {
     if (!isFullStr(table)) {
       throw new QueryError(`Invalid JOIN table: ${String(table)}`);
+    }
+
+    if (condition instanceof Condition) {
+      this.state.joins.push({
+        table,
+        condition,
+        type: 'INNER',
+      });
+
+      return this;
     }
 
     if (!isFunc(condition)) {
@@ -501,7 +516,7 @@ export class Select extends Query<Rows> {
 
     const join = {
       table,
-      condition: new Condition(this),
+      condition: new Condition(this.connection.driver),
       type: 'INNER',
     };
 
@@ -521,19 +536,35 @@ export class Select extends Query<Rows> {
    *
    * @note You can chain multiple `leftJoin()` calls to join more than two tables in a single query result.
    */
+  public leftJoin(table: string, condition: (col: Col, con: Con) => void): this;
+  public leftJoin(table: string, condition: Condition): this;
   public leftJoin(
     table: string,
-    condition: (col: Col, con: Con) => void
+    condition: ((col: Col, con: Con) => void) | Condition
   ): this {
     if (!isFullStr(table)) {
       throw new QueryError(`Invalid JOIN table: ${String(table)}`);
+    }
+
+    if (condition instanceof Condition) {
+      this.state.joins.push({
+        table,
+        condition,
+        type: 'LEFT',
+      });
+
+      return this;
     }
 
     if (!isFunc(condition)) {
       throw new QueryError(`Invalid JOIN condition: ${String(condition)}`);
     }
 
-    const join = { table, condition: new Condition(this), type: 'LEFT' };
+    const join = {
+      table,
+      condition: new Condition(this.connection.driver),
+      type: 'LEFT',
+    };
 
     condition(join.condition.col.bind(join.condition), join.condition);
 
@@ -551,12 +582,24 @@ export class Select extends Query<Rows> {
    *
    * @note You can chain multiple `rightJoin()` calls to join more than two tables in a single query result.
    */
+  public rightJoin(table: string, con: (col: Col, con: Con) => void): this;
+  public rightJoin(table: string, con: Condition): this;
   public rightJoin(
     table: string,
-    condition: (col: Col, con: Con) => void
+    condition: ((col: Col, con: Con) => void) | Condition
   ): this {
     if (!isFullStr(table)) {
       throw new QueryError(`Invalid JOIN table: ${String(table)}`);
+    }
+
+    if (condition instanceof Condition) {
+      this.state.joins.push({
+        table,
+        condition,
+        type: 'RIGHT',
+      });
+
+      return this;
     }
 
     if (!isFunc(condition)) {
@@ -565,7 +608,7 @@ export class Select extends Query<Rows> {
 
     const join = {
       table,
-      condition: new Condition(this),
+      condition: new Condition(this.connection.driver),
       type: 'RIGHT',
     };
 
@@ -621,13 +664,20 @@ export class Select extends Query<Rows> {
    * @returns The `Select` query instance (`this`) to allow method chaining.
    * @throws `QueryError` if the condition is not a function.
    */
-  public where(condition: (col: Col, con: Con) => void): this {
+  public where(condition: (col: Col, con: Con) => void): this;
+  public where(condition: Condition): this;
+  public where(condition: ((col: Col, con: Con) => void) | Condition): this {
+    if (condition instanceof Condition) {
+      this.state.where = condition;
+      return this;
+    }
+
     if (!isFunc(condition)) {
       throw new QueryError(`Invalid SELECT condition: ${String(condition)}`);
     }
 
     if (isUndefined(this.state.where)) {
-      this.state.where = new Condition(this);
+      this.state.where = new Condition(this.connection.driver);
     }
 
     condition(this.state.where.col.bind(this.state.where), this.state.where);
@@ -642,13 +692,20 @@ export class Select extends Query<Rows> {
    * @returns The `Select` query instance (`this`) to allow method chaining.
    * @throws `QueryError` if the condition is not a valid string.
    */
-  public having(condition: (col: Col, con: Con) => void): this {
+  public having(condition: (col: Col, con: Con) => void): this;
+  public having(condition: Condition): this;
+  public having(condition: ((col: Col, con: Con) => void) | Condition): this {
+    if (condition instanceof Condition) {
+      this.state.having = condition;
+      return this;
+    }
+
     if (!isFunc(condition)) {
       throw new QueryError(`Invalid HAVING condition: ${String(condition)}`);
     }
 
     if (isUndefined(this.state.having)) {
-      this.state.having = new Condition(this);
+      this.state.having = new Condition(this.connection.driver);
     }
 
     condition(this.state.having.col.bind(this.state.having), this.state.having);

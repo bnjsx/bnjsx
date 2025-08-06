@@ -58,7 +58,8 @@ export class Delete extends Query<void> {
   /**
    * The condition specifying which rows to delete.
    * This condition must be provided to prevent accidental deletions of all rows.
-   */ private condition: Condition;
+   */
+  private condition: Condition;
 
   /**
    * Resets the current `Delete` instance by clearing all query properties.
@@ -119,13 +120,20 @@ export class Delete extends Query<void> {
    * @returns The `Delete` query instance (`this`) to allow method chaining.
    * @throws `QueryError` if `condition` is not a function.
    */
-  public where(condition: (col: Col, con: Con) => void): this {
+  public where(condition: (col: Col, con: Con) => void): this;
+  public where(condition: Condition): this;
+  public where(condition: ((col: Col, con: Con) => void) | Condition): this {
+    if (condition instanceof Condition) {
+      this.condition = condition;
+      return this;
+    }
+
     if (!isFunc(condition)) {
       throw new QueryError(`Invalid DELETE condition: ${String(condition)}`);
     }
 
     if (isUndefined(this.condition)) {
-      this.condition = new Condition(this);
+      this.condition = new Condition(this.connection.driver);
     }
 
     condition(this.condition.col.bind(this.condition), this.condition);
@@ -170,7 +178,7 @@ export class Delete extends Query<void> {
    */
   public paren(): this {
     if (isUndefined(this.condition)) {
-      this.condition = new Condition(this);
+      this.condition = new Condition(this.connection.driver);
     }
 
     this.condition.paren();
@@ -185,7 +193,7 @@ export class Delete extends Query<void> {
    */
   public open(): this {
     if (isUndefined(this.condition)) {
-      this.condition = new Condition(this);
+      this.condition = new Condition(this.connection.driver);
     }
 
     this.condition.open();

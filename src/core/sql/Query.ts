@@ -148,7 +148,7 @@ export abstract class Query<T> {
    */
   public raw<R = QueryResult>(
     query: string,
-    values?: Array<string | number>
+    values?: Array<string | number | boolean>
   ): Promise<R> {
     return this.connection.query(query, values) as Promise<R>;
   }

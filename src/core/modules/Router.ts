@@ -1,5 +1,5 @@
 import { isArrOfFunc, isHTTPMethod, isRegex, isStr } from '../../helpers';
-import { Middleware } from './App';
+import { Middleware } from '../middlewares';
 import { HTTPMethod } from '../../config';
 
 /**
@@ -23,7 +23,7 @@ type Route = {
  * @property `middlewares` The middleware functions associated with the matched route.
  * @property `params` Extracted route parameters as a key-value object or an array.
  */
-type RouteMatch = {
+export type RouteMatch = {
   middlewares: Middleware[];
   params: Record<string, string> | Array<string>;
 };
@@ -58,7 +58,7 @@ export class Router {
     method: HTTPMethod | '*',
     path: string | RegExp,
     ...middlewares: Middleware[]
-  ): void {
+  ): this {
     if (!isHTTPMethod(method) && method !== '*') {
       throw new RouterError('Invalid route method');
     }
@@ -84,7 +84,7 @@ export class Router {
         .replace(/\/:([^\/\?]+)/g, (_, name: string) => {
           params.push(name);
           return '(?:\\/([^\\/]+))';
-        })}$`
+        })}\/?$`
     );
 
     if (params.length === 0) {
@@ -93,6 +93,8 @@ export class Router {
     }
 
     this.routes.push({ method, pattern, params, middlewares });
+
+    return this;
   }
 
   /**
@@ -101,8 +103,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public get(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public get(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('GET', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -111,8 +114,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public post(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public post(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('POST', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -121,8 +125,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public put(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public put(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('PUT', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -131,8 +136,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public delete(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public delete(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('DELETE', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -141,8 +147,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public patch(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public patch(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('PATCH', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -151,8 +158,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public options(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public options(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('OPTIONS', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -161,8 +169,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public head(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public head(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('HEAD', path, ...middlewares);
+    return this;
   }
 
   /**
@@ -171,8 +180,9 @@ export class Router {
    * @param path The route path as a string (supports dynamic parameters) or a RegExp.
    * @param middlewares The middleware functions to be executed for this route.
    */
-  public all(path: string | RegExp, ...middlewares: Middleware[]): void {
+  public all(path: string | RegExp, ...middlewares: Middleware[]): this {
     this.add('*', path, ...middlewares);
+    return this;
   }
 
   /**

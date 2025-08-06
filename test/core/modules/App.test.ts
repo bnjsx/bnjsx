@@ -86,25 +86,14 @@ jest.mock('crypto', () => ({
   }),
 }));
 
-import EventEmitter from 'events';
-
 import {
   App,
   AppError,
   appKey,
-  asset,
-  cookie,
-  cors,
-  csrf,
-  json,
-  origin,
-  ranger,
-  secure,
   START,
   STARTED,
   STOP,
   STOPPED,
-  text,
 } from '../../../src/core/modules/App';
 
 import {
@@ -113,8 +102,9 @@ import {
   NotFoundError,
 } from '../../../src/errors';
 
-import { OriginFunc } from '../../../src/config';
 import { Router } from '../../../src/core/modules/Router';
+import { Service } from '../../../src/core/modules/Service';
+import * as helpers from '../../../src/helpers';
 
 describe('App class', () => {
   let app: App;
@@ -203,6 +193,7 @@ describe('App class', () => {
       (App as any).app = undefined;
       app = new App();
     });
+
     it('should add a router to a namespace', () => {
       const router = new Router();
       app.namespace('/', router);
@@ -212,9 +203,46 @@ describe('App class', () => {
       expect(app['routers']['/users']).toEqual([router]);
     });
 
+    it('should add a service to a namespace', () => {
+      class User extends Service {}
+      app.namespace('/', User);
+      app.namespace('/users', User);
+
+      expect(app['routers']['/']).toEqual([User]);
+      expect(app['routers']['/users']).toEqual([User]);
+    });
+
     it('should throw an error for invalid router or namespace', () => {
       expect(() => app.namespace(123 as any, {} as any)).toThrow(AppError);
       expect(() => app.namespace('/', {} as any)).toThrow(AppError);
+    });
+  });
+
+  describe('register', () => {
+    beforeEach(() => {
+      // Initialize app before each test
+      (App as any).app = undefined;
+      app = new App();
+    });
+
+    it('should add a router to the root namespace', () => {
+      const router = new Router();
+      app.register(router);
+      app.register(router);
+
+      expect(app['routers']['/']).toEqual([router, router]);
+    });
+
+    it('should add a service to the root', () => {
+      class User extends Service {}
+      app.register(User).register(User);
+
+      expect(app['routers']['/']).toEqual([User, User]);
+    });
+
+    it('should throw an error for invalid router', () => {
+      expect(() => app.register({} as any)).toThrow(AppError);
+      expect(() => app.register(123 as any)).toThrow(AppError);
     });
   });
 
@@ -316,132 +344,6 @@ describe('App class', () => {
     });
   });
 
-  describe('handler', () => {
-    let app: any;
-    let req: any;
-    let res: any;
-    let consoleLogSpy: jest.SpyInstance;
-
-    beforeEach(() => {
-      (App as any).app = undefined;
-      consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-      app = new App();
-      req = {};
-      res = {
-        writableEnded: false,
-        status: jest.fn().mockReturnThis(),
-        render: jest.fn(() => Promise.resolve()),
-        json: jest.fn(() => Promise.resolve()),
-        end: jest.fn(() => (res.writableEnded = true)),
-      };
-    });
-
-    afterEach(() => {
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should execute custom handlers if defined', async () => {
-      const customHandler = jest.fn(async () => res.end());
-      app.handlers = [customHandler];
-
-      await app.handler(req, res, new Error('Test Error'));
-
-      expect(customHandler).toHaveBeenCalledWith(req, res, expect.any(Error));
-    });
-
-    it('should log the error in development mode', async () => {
-      app.options.env = 'dev';
-
-      await app.handler(req, res, new Error('Test Error'));
-
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.any(String));
-    });
-
-    it('should render the correct error page for web mode (400)', async () => {
-      app.options.mode = 'web';
-
-      await app.handler(req, res, new BadRequestError());
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.render).toHaveBeenCalledWith('errors.400');
-    });
-
-    it('should render the correct error page for web mode (403)', async () => {
-      app.options.mode = 'web';
-
-      await app.handler(req, res, new ForbiddenError());
-
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.render).toHaveBeenCalledWith('errors.403');
-    });
-
-    it('should render the correct error page for web mode (404)', async () => {
-      app.options.mode = 'web';
-
-      await app.handler(req, res, new NotFoundError());
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.render).toHaveBeenCalledWith('errors.404');
-    });
-
-    it('should return JSON response for API mode (400)', async () => {
-      app.options.mode = 'api';
-
-      await app.handler(req, res, new BadRequestError());
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'BadRequestError',
-        message: 'Bad Request.',
-      });
-    });
-
-    it('should return JSON response for API mode (403)', async () => {
-      app.options.mode = 'api';
-
-      await app.handler(req, res, new ForbiddenError());
-
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'ForbiddenError',
-        message: 'Access Forbidden.',
-      });
-    });
-
-    it('should return JSON response for API mode (404)', async () => {
-      app.options.mode = 'api';
-
-      await app.handler(req, res, new NotFoundError());
-
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'NotFoundError',
-        message: 'The requested resource could not be found.',
-      });
-    });
-
-    it('should return a 500 error response for unknown errors (web mode)', async () => {
-      app.options.mode = 'web';
-
-      await app.handler(req, res, new Error('Unknown error'));
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.render).toHaveBeenCalledWith('errors.500');
-    });
-
-    it('should return a 500 error response for unknown errors (API mode)', async () => {
-      app.options.mode = 'api';
-
-      await app.handler(req, res, new Error('Unknown error'));
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: 'ServerError',
-        message: 'Ops! Something went wrong.',
-      });
-    });
-  });
-
   describe('process', () => {
     let app: any;
     let req: any;
@@ -451,38 +353,130 @@ describe('App class', () => {
       (App as any).app = undefined;
       app = new App();
       app.handler = jest.fn(async () => {});
-      req = { url: '/', method: 'GET' };
+      req = {
+        url: '/',
+        method: 'GET',
+        getIp: jest.fn(),
+        getBase: jest.fn(),
+      };
       res = {
         writableEnded: false,
         end: jest.fn(() => (res.writableEnded = true)),
       };
     });
 
-    it('should execute middlewares for a valid route', async () => {
-      // Global middlewares
-      const middleware1 = jest.fn(async () => {});
-      const middleware2 = jest.fn(async () => {});
+    it('should execute middlewares for a valid route (Service)', async () => {
+      // URL && Method
+      req.url = 'http://localhost:3030/users//';
+      req.method = 'GET';
 
-      // Local middleware
-      const middleware3 = jest.fn(async () => res.end());
+      // Global middlewares
+      const global1 = jest.fn(async () => {}); // exec
+      const global2 = jest.fn(async () => {}); // exec
 
       // Register Global middlewares
-      app.middlewares = [middleware1, middleware2];
+      app.use(global1).use(global2);
 
-      // Register a route
-      app.routers = {
-        '/': [
-          {
-            match: jest.fn(() => ({ params: {}, middlewares: [middleware3] })),
-          },
-        ],
+      // Local middleware
+      const getPosts = jest.fn(async () => res.end());
+      const getUsers = jest.fn(async () => res.end()); // exec
+      const postUsers = jest.fn(async () => res.end());
+
+      const router = new Router().get('/posts', getPosts);
+
+      const User = class extends Service {
+        constructor(req, res) {
+          super(req, res);
+
+          this.get('/users', getUsers); // match and exec getUsers
+          this.post('/users', postUsers);
+        }
       };
+
+      // Register router/service
+      app.register(router).register(User);
 
       await expect(app.process(req, res)).resolves.toBeUndefined();
 
-      expect(middleware1).toHaveBeenCalledWith(req, res, undefined);
-      expect(middleware2).toHaveBeenCalledWith(req, res, undefined);
-      expect(middleware3).toHaveBeenCalledWith(req, res, undefined);
+      expect(global1).toHaveBeenCalledWith(req, res, undefined);
+      expect(global2).toHaveBeenCalledWith(req, res, undefined);
+      expect(getUsers).toHaveBeenCalledWith(req, res, undefined);
+    });
+
+    it('should execute middlewares for a valid route (Router)', async () => {
+      // URL && Method
+      req.url = 'http://localhost:3030/posts';
+      req.method = 'GET';
+
+      // Global middlewares
+      const global1 = jest.fn(async () => {}); // exec
+      const global2 = jest.fn(async () => {}); // exec
+
+      // Register Global middlewares
+      app.use(global1).use(global2);
+
+      // Local middleware
+      const getPosts = jest.fn(async () => res.end()); // exec
+      const getUsers = jest.fn(async () => res.end());
+      const postUsers = jest.fn(async () => res.end());
+
+      const router = new Router().get('/posts', getPosts);
+
+      const User = class extends Service {
+        constructor(req, res) {
+          super(req, res);
+
+          this.get('/users', getUsers); // match and exec getUsers
+          this.post('/users', postUsers);
+        }
+      };
+
+      // Register router/service
+      app.register(router).register(User);
+
+      await expect(app.process(req, res)).resolves.toBeUndefined();
+
+      expect(global1).toHaveBeenCalledWith(req, res, undefined);
+      expect(global2).toHaveBeenCalledWith(req, res, undefined);
+      expect(getPosts).toHaveBeenCalledWith(req, res, undefined);
+    });
+
+    it('should execute middlewares for a valid route (Namespace)', async () => {
+      // URL && Method
+      req.url = 'http://localhost:3030/posts';
+      req.method = 'GET';
+
+      // Global middlewares
+      const global1 = jest.fn(async () => {}); // exec
+      const global2 = jest.fn(async () => {}); // exec
+
+      // Register Global middlewares
+      app.use(global1).use(global2);
+
+      // Local middleware
+      const getPosts = jest.fn(async () => res.end()); // exec
+      const getUsers = jest.fn(async () => res.end());
+      const postUsers = jest.fn(async () => res.end());
+
+      const router = new Router().get('/', getPosts);
+
+      const User = class extends Service {
+        constructor(req, res) {
+          super(req, res);
+
+          this.get('/', getUsers); // match and exec getUsers
+          this.post('/', postUsers);
+        }
+      };
+
+      // Register router/service
+      app.namespace('/posts', router).namespace('/users', User);
+
+      await expect(app.process(req, res)).resolves.toBeUndefined();
+
+      expect(global1).toHaveBeenCalledWith(req, res, undefined);
+      expect(global2).toHaveBeenCalledWith(req, res, undefined);
+      expect(getPosts).toHaveBeenCalledWith(req, res, undefined);
     });
 
     it('should handle undefined namespace (404)', async () => {
@@ -573,6 +567,52 @@ describe('App class', () => {
       expect(req.query.get('id')).toBe('123');
       expect(req.params).toEqual({ id: '123' });
     });
+
+    it('should store multiple query params as array', async () => {
+      req.url = '/users?keywords=1&keywords=2';
+      req.method = 'GET';
+
+      const getUsers = jest.fn(async function (this: any) {
+        const query = this.query; // validation entry
+        expect(query.get('keywords')).toEqual(['1', '2']);
+        res.end();
+      });
+
+      const User = class extends Service {
+        constructor(req, res) {
+          super(req, res);
+          this.get('/users', getUsers);
+        }
+      };
+
+      app.register(User);
+
+      await expect(app.process(req, res)).resolves.toBeUndefined();
+      expect(getUsers).toHaveBeenCalled();
+    });
+
+    it('should store single query param as string', async () => {
+      req.url = '/users?keywords=1';
+      req.method = 'GET';
+
+      const getUsers = jest.fn(async function (this: any) {
+        const query = this.query;
+        expect(query.get('keywords')).toBe('1');
+        res.end();
+      });
+
+      const User = class extends Service {
+        constructor(req, res) {
+          super(req, res);
+          this.get('/users', getUsers);
+        }
+      };
+
+      app.register(User);
+
+      await expect(app.process(req, res)).resolves.toBeUndefined();
+      expect(getUsers).toHaveBeenCalled();
+    });
   });
 
   describe('execute', () => {
@@ -641,835 +681,97 @@ describe('App class', () => {
       );
     });
   });
-});
 
-describe('origin', () => {
-  it('should allow all origins when "*" is passed', async () => {
-    await expect(origin('example.com', '*')).resolves.toBe(true);
-  });
-
-  it('should return true when the origin exists in the array', async () => {
-    await expect(
-      origin('example.com', ['example.com', 'test.com'])
-    ).resolves.toBe(true);
-  });
-
-  it('should return false when the origin does not exist in the array', async () => {
-    await expect(
-      origin('example.com', ['test.com', 'another.com'])
-    ).resolves.toBe(false);
-  });
-
-  it('should execute the function and resolve with its return value', async () => {
-    const mockFunc: OriginFunc = jest.fn().mockResolvedValue(true);
-    await expect(origin('example.com', mockFunc)).resolves.toBe(true);
-    expect(mockFunc).toHaveBeenCalledWith('example.com');
-  });
-
-  it('should return false for an invalid origins parameter', async () => {
-    await expect(origin('example.com', {} as any)).resolves.toBe(false);
-  });
-});
-
-describe('ranger', () => {
-  it('should parse valid range header', () => {
-    expect(ranger('bytes=10-20', 100)).toEqual({
-      start: 10,
-      end: 20,
-      size: 100,
-    });
-  });
-
-  it('should return null for an invalid range header', () => {
-    expect(ranger('invalid-header', 100)).toBeNull();
-  });
-
-  it('should handle a range with only an end', () => {
-    expect(ranger('bytes=-20', 100)).toEqual({ start: 80, end: 99, size: 100 });
-  });
-
-  it('should handle a range with only a start', () => {
-    expect(ranger('bytes=30-', 100)).toEqual({ start: 30, end: 99, size: 100 });
-  });
-
-  it('should return null for out-of-bounds ranges', () => {
-    expect(ranger('bytes=110-120', 100)).toBeNull();
-  });
-
-  it('should return null for invalid start > end', () => {
-    expect(ranger('bytes=50-40', 100)).toBeNull();
-  });
-
-  it('should return null if both start and end are missing or null', () => {
-    expect(ranger('bytes=', 100)).toBeNull(); // No start and end specified
-    expect(ranger('bytes=-', 100)).toBeNull(); // Neither start nor end
-  });
-});
-
-describe('cookie', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = { getHeader: jest.fn() };
-    res = {};
-  });
-
-  it('should correctly parse cookies', async () => {
-    req.getHeader.mockReturnValue('name=JohnDoe; session=abc123');
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({
-      name: 'JohnDoe',
-      session: 'abc123',
-    });
-  });
-
-  it('should return empty object if cookie header is missing', async () => {
-    req.getHeader.mockReturnValue(undefined);
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({});
-  });
-
-  it('should return empty object if cookie header is an empty string', async () => {
-    req.getHeader.mockReturnValue('');
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({});
-  });
-
-  it('should correctly handle multiple cookies', async () => {
-    req.getHeader.mockReturnValue('theme=dark; lang=en; token=xyz');
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({
-      theme: 'dark',
-      lang: 'en',
-      token: 'xyz',
-    });
-  });
-
-  it('should handle cookies with spaces correctly', async () => {
-    req.getHeader.mockReturnValue('user=John Doe; city=New York');
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({
-      user: 'John Doe',
-      city: 'New York',
-    });
-  });
-
-  it('should decode URL-encoded cookie values', async () => {
-    req.getHeader.mockReturnValue('city=New%20York; language=en%20US');
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({
-      city: 'New York',
-      language: 'en US',
-    });
-  });
-
-  it('should ignore malformed cookies', async () => {
-    req.getHeader.mockReturnValue('valid=good; =bad; incomplete');
-
-    await cookie(req, res);
-
-    expect(req.cookies).toEqual({
-      valid: 'good',
-    });
-  });
-});
-
-describe('json', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = new EventEmitter();
-    req.getHeader = jest.fn();
-    res = {};
-  });
-
-  it('should parse a valid JSON request body', async () => {
-    req.getHeader.mockReturnValue('application/json');
-
-    const data = { name: 'John' };
-    const promise = json(req, res);
-
-    req.emit('data', Buffer.from(JSON.stringify(data)));
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toEqual(data);
-  });
-
-  it('should do nothing if content type is not application/json', async () => {
-    req.getHeader.mockReturnValue('text/plain');
-
-    await expect(json(req, res)).resolves.toBeUndefined();
-    expect(req.body).toBeUndefined();
-  });
-
-  it('should handle empty request bodies gracefully', async () => {
-    req.getHeader.mockReturnValue('application/json');
-
-    const promise = json(req, res);
-
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toBeUndefined();
-  });
-
-  it('should reject invalid JSON with an error', async () => {
-    req.getHeader.mockReturnValue('application/json');
-
-    const promise = json(req, res);
-
-    req.emit('data', Buffer.from('{invalid json}'));
-    req.emit('end');
-
-    await expect(promise).rejects.toThrow();
-  });
-
-  it('should work with chunked JSON data', async () => {
-    req.getHeader.mockReturnValue('application/json');
-
-    const promise = json(req, res);
-
-    req.emit('data', Buffer.from('{"name":'));
-    req.emit('data', Buffer.from('"Alice"}'));
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toEqual({ name: 'Alice' });
-  });
-
-  it('should do nothing if content type is undefined', async () => {
-    req.getHeader.mockReturnValue(undefined); // Content type is undefined
-
-    await expect(json(req, res)).resolves.toBeUndefined();
-    expect(req.body).toBeUndefined();
-  });
-});
-
-describe('text', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = new EventEmitter();
-    req.getHeader = jest.fn();
-    res = {};
-  });
-
-  it('should parse a plain text request body', async () => {
-    req.getHeader.mockReturnValue('text/plain');
-
-    const data = 'Hello, World!';
-    const promise = text(req, res);
-
-    req.emit('data', Buffer.from(data));
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toBe(data);
-  });
-
-  it('should parse an HTML text request body', async () => {
-    req.getHeader.mockReturnValue('text/html');
-
-    const data = '<h1>Hello</h1>';
-    const promise = text(req, res);
-
-    req.emit('data', Buffer.from(data));
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toBe(data);
-  });
-
-  it('should do nothing if content type is not text/plain or text/html', async () => {
-    req.getHeader.mockReturnValue('application/json');
-
-    await expect(text(req, res)).resolves.toBeUndefined();
-    expect(req.body).toBeUndefined();
-  });
-
-  it('should handle empty text request bodies gracefully', async () => {
-    req.getHeader.mockReturnValue('text/plain');
-
-    const promise = text(req, res);
-
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toBe('');
-  });
-
-  it('should work with chunked text data', async () => {
-    req.getHeader.mockReturnValue('text/plain');
-
-    const promise = text(req, res);
-
-    req.emit('data', Buffer.from('Hello, '));
-    req.emit('data', Buffer.from('World!'));
-    req.emit('end');
-
-    await expect(promise).resolves.toBeUndefined();
-    expect(req.body).toBe('Hello, World!');
-  });
-
-  it('should do nothing if content type is undefined', async () => {
-    req.getHeader.mockReturnValue(undefined); // Content type is undefined
-
-    await expect(text(req, res)).resolves.toBeUndefined();
-    expect(req.body).toBeUndefined();
-  });
-});
-
-describe('asset', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = new EventEmitter();
-    req.getHeader = jest.fn();
-    req.path = '/test.txt';
-
-    res = {
-      setHeader: jest.fn(),
-      status: jest.fn().mockReturnThis(),
-      send: jest.fn(() => Promise.resolve()),
-      stream: jest.fn(() => Promise.resolve()),
-    };
-
-    // Disable gzip
-    options.public.gzip = false;
-    options.public.root = __dirname;
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('should return a file when it exists', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 13,
-      mtimeMs: new Date().getTime(),
-    };
-
-    const mock = require('fs/promises').stat;
-    mock.mockResolvedValue(stats);
-
-    await expect(asset(req, res)).resolves.toBeUndefined();
-
-    expect(res.setHeader).toHaveBeenCalledWith('Accept-Ranges', 'bytes');
-    expect(res.setHeader).toHaveBeenCalledWith('Content-Length', stats.size);
-
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Content-Type',
-      'text/plain; charset=utf-8'
-    );
-
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Cache-Control',
-      'public, max-age=1000'
-    );
-
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Last-Modified',
-      stats.mtimeMs.toString()
-    );
-
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'ETag',
-      `${stats.mtimeMs}-${stats.size}`
-    );
-
-    expect(res.setHeader).toHaveBeenCalledTimes(6);
-    expect(res.stream).toHaveBeenCalled();
-  });
-
-  it('should return 304 if ETag matches', async () => {
-    const mock = require('fs/promises').stat;
-    const stats = {
-      isFile: () => true,
-      size: 13,
-      mtimeMs: new Date().getTime(),
-    };
-
-    mock.mockResolvedValue(stats);
-
-    req.getHeader.mockImplementation((header: string) => {
-      if (header === 'If-None-Match') return `${stats.mtimeMs}-${stats.size}`;
-      return null;
+  describe('handler', () => {
+    let app: any;
+    let req: any;
+    let res: any;
+    let err: Error;
+    let buggerSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      (App as any).app = undefined;
+      app = new App();
+      app['handlers'] = [];
+      err = new Error('test error');
+
+      req = {};
+      res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn().mockResolvedValue(undefined),
+        html: jest.fn().mockResolvedValue(undefined),
+      };
+
+      buggerSpy = jest.spyOn(helpers, 'bugger').mockImplementation(() => {});
     });
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
-    expect(res.status).toHaveBeenCalledWith(304);
-    expect(res.send).toHaveBeenCalled();
-  });
-
-  it('should return 304 if If-Modified-Since matches', async () => {
-    const mock = require('fs/promises').stat;
-    const stats = {
-      isFile: () => true,
-      size: 13,
-      mtimeMs: new Date().getTime(),
-    };
-
-    mock.mockResolvedValue(stats);
-
-    req.getHeader.mockImplementation((header: string) => {
-      if (header === 'If-Modified-Since') return stats.mtimeMs.toString();
-      return null;
+    afterEach(() => {
+      buggerSpy.mockRestore();
     });
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
-    expect(res.status).toHaveBeenCalledWith(304);
-    expect(res.send).toHaveBeenCalled();
-  });
+    it('should execute handlers if no error in dev env', async () => {
+      const handler = jest.fn().mockResolvedValue(undefined);
+      app['handlers'] = [handler];
 
-  it('should resolve if file does not exist', async () => {
-    const mock = require('fs/promises').stat;
-    mock.mockRejectedValue({ code: 'ENOENT' });
+      await expect(app['handler'](req, res, err)).resolves.toBeUndefined();
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
-  });
-
-  it('should reject with other errors', async () => {
-    const mock = require('fs/promises').stat;
-    mock.mockRejectedValue(new Error('Some error'));
-
-    await expect(asset(req, res)).rejects.toThrow('Some error');
-  });
-
-  it('should return 416 if range is invalid', async () => {
-    const mock = require('fs/promises').stat;
-    const stats = {
-      isFile: () => true,
-      size: 13,
-      mtimeMs: new Date().getTime(),
-    };
-
-    mock.mockResolvedValue(stats);
-
-    req.getHeader.mockImplementation((key: string) => {
-      if (key === 'Range') return 'bytes=50-100';
-      return null;
+      expect(handler).toHaveBeenCalledWith(req, res, err);
+      expect(buggerSpy).toHaveBeenCalledWith(err);
     });
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
-    expect(res.status).toHaveBeenCalledWith(416);
-    expect(res.send).toHaveBeenCalled();
-  });
+    it('should return JSON response if execute fails and mode is api', async () => {
+      app.options.mode = 'api';
+      const executeMock = jest
+        .spyOn(app, 'execute')
+        .mockRejectedValue(new Error('exec fail'));
 
-  it('should return 206 (Partial Content) for a valid range', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 1000,
-      mtimeMs: new Date().getTime(),
-    };
+      await expect(app['handler'](req, res, err)).resolves.toBeUndefined();
 
-    require('fs/promises').stat.mockResolvedValue(stats);
-
-    req.getHeader.mockImplementation((header: string) => {
-      if (header === 'Range') return 'bytes=200-499';
-      return null;
+      expect(executeMock).toHaveBeenCalled();
+      expect(buggerSpy).toHaveBeenCalledTimes(2); // once before, once after fail
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          name: 'ServerError',
+          message: 'Ops! Something went wrong.',
+        },
+      });
     });
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
+    it('should return HTML response if execute fails and mode is web', async () => {
+      app.options.mode = 'web';
+      const executeMock = jest
+        .spyOn(app, 'execute')
+        .mockRejectedValue(new Error('exec fail'));
 
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Content-Range',
-      'bytes 200-499/1000'
-    );
+      await expect(app['handler'](req, res, err)).resolves.toBeUndefined();
 
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Content-Type',
-      'text/plain; charset=utf-8'
-    );
-
-    expect(res.setHeader).toHaveBeenCalledWith('Accept-Ranges', 'bytes');
-    expect(res.setHeader).toHaveBeenCalledWith('Content-Length', 300);
-    expect(res.setHeader).toHaveBeenCalledTimes(4);
-    expect(res.status).toHaveBeenCalledWith(206);
-    expect(res.stream).toHaveBeenCalled();
-  });
-
-  it('should serve gzipped file if Accept-Encoding includes gzip', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 50,
-      mtimeMs: new Date().getTime(),
-    };
-
-    require('fs/promises').stat.mockResolvedValue(stats);
-    require('fs/promises').access.mockResolvedValue();
-
-    options.public.gzip = true; // enable gzip
-
-    req.getHeader.mockImplementation((key: string) => {
-      if (key === 'Accept-Encoding') return 'gzip, deflate';
-      return null;
+      expect(executeMock).toHaveBeenCalled();
+      expect(buggerSpy).toHaveBeenCalledTimes(2);
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.html).toHaveBeenCalledWith(
+        expect.stringContaining('<h1>500 | SERVER ERROR</h1>')
+      );
     });
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
-    expect(res.setHeader).toHaveBeenCalledWith('Content-Encoding', 'gzip');
-    expect(res.setHeader).toHaveBeenCalledTimes(7);
-    expect(res.stream).toHaveBeenCalled();
-  });
+    it('should catch final render errors and still resolve', async () => {
+      app.options.mode = 'web';
+      jest.spyOn(app, 'execute').mockRejectedValue(new Error('fail'));
+      res.html = jest.fn().mockRejectedValue(new Error('fail render'));
 
-  it('should serve gzipped file if Accept-Encoding includes gzip', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 50,
-      mtimeMs: new Date().getTime(),
-    };
-
-    require('fs/promises').stat.mockResolvedValue(stats);
-    require('fs/promises').access.mockRejectedValue();
-
-    options.public.gzip = true; // enable gzip
-
-    req.getHeader.mockImplementation((key: string) => {
-      if (key === 'Accept-Encoding') return 'gzip, deflate';
-      return null;
+      await expect(app['handler'](req, res, err)).resolves.toBeUndefined();
+      expect(res.html).toHaveBeenCalled();
     });
 
-    await expect(asset(req, res)).resolves.toBeUndefined();
+    it('should catch json render errors and still resolve', async () => {
+      app.options.mode = 'api';
+      jest.spyOn(app, 'execute').mockRejectedValue(new Error('fail'));
+      res.json = jest.fn().mockRejectedValue(new Error('fail render'));
 
-    expect(res.setHeader).toHaveBeenCalledTimes(6);
-    expect(res.stream).toHaveBeenCalled();
-  });
-
-  it('should resolve the root if not absolute', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 50,
-      mtimeMs: new Date().getTime(),
-    };
-
-    require('fs/promises').stat.mockResolvedValue(stats);
-
-    options.public.root = 'public';
-    await expect(asset(req, res)).resolves.toBeUndefined();
-
-    expect(require('fs').createReadStream).toHaveBeenCalledWith(
-      require('path').resolve(__dirname, 'public', './test.txt')
-    );
-  });
-
-  it('should reject with ForbiddenError if path is outside root', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 50,
-      mtimeMs: new Date().getTime(),
-    };
-
-    require('fs/promises').stat.mockResolvedValue(stats);
-
-    req.path = '../../secret.txt';
-    await expect(asset(req, res)).rejects.toThrow(ForbiddenError);
-  });
-
-  it('should resolve without sending a file if path is not a file', async () => {
-    require('fs/promises').stat.mockResolvedValue({
-      isFile: () => false,
+      await expect(app['handler'](req, res, err)).resolves.toBeUndefined();
+      expect(res.json).toHaveBeenCalled();
     });
-
-    await expect(asset(req, res)).resolves.toBeUndefined();
-    expect(res.setHeader).not.toHaveBeenCalled();
-    expect(res.stream).not.toHaveBeenCalled();
-  });
-
-  it('should use buffer as a fallback mime type', async () => {
-    const stats = {
-      isFile: () => true,
-      size: 50,
-      mtimeMs: new Date().getTime(),
-    };
-
-    require('fs/promises').stat.mockResolvedValue(stats);
-
-    // invalid file
-    req.path = '/foo';
-
-    await expect(asset(req, res)).resolves.toBeUndefined();
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Content-Type',
-      'application/octet-stream'
-    );
-  });
-});
-
-describe('CORS Middleware', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = {
-      headers: { origin: 'https://allowed.com' },
-      method: 'GET',
-    };
-
-    res = {
-      setHeader: jest.fn(),
-      status: jest.fn().mockReturnThis(),
-      send: jest.fn(),
-    };
-  });
-
-  it('should allow requests from allowed origins', async () => {
-    await expect(cors(req, res)).resolves.toBeUndefined();
-
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Access-Control-Allow-Origin',
-      'https://allowed.com'
-    );
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Access-Control-Allow-Methods',
-      'GET, POST'
-    );
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Access-Control-Allow-Credentials',
-      'true'
-    );
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Access-Control-Allow-Headers',
-      'Authorization'
-    );
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Access-Control-Expose-Headers',
-      'X-Custom-Header'
-    );
-    expect(res.setHeader).toHaveBeenCalledWith('Access-Control-Max-Age', 600);
-    expect(res.setHeader).toHaveBeenCalledWith('Vary', 'Origin');
-  });
-
-  it('should reject requests from disallowed origins', async () => {
-    req.headers.origin = 'https://forbidden.com';
-
-    await expect(cors(req, res)).rejects.toThrow(
-      new ForbiddenError(`This origin is forbidden: 'https://forbidden.com'`)
-    );
-  });
-
-  it('should return 204 for preflight OPTIONS request', async () => {
-    req.method = 'OPTIONS';
-
-    await expect(cors(req, res)).resolves.toBeUndefined();
-
-    expect(res.status).toHaveBeenCalledWith(204);
-    expect(res.send).toHaveBeenCalled();
-  });
-
-  it('should do nothing if no origin header is present', async () => {
-    req.headers.origin = undefined;
-
-    await expect(cors(req, res)).resolves.toBeUndefined();
-    expect(res.setHeader).not.toHaveBeenCalled();
-  });
-});
-
-describe('Security Headers Middleware', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = {};
-    res = {
-      setHeader: jest.fn(),
-    };
-  });
-
-  it('should set Content-Security-Policy header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' trusted.com; upgrade-insecure-requests"
-    );
-  });
-
-  it('should set Strict-Transport-Security header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Strict-Transport-Security',
-      'max-age=31536000; preload; includeSubDomains'
-    );
-  });
-
-  it('should set Referrer-Policy header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Referrer-Policy',
-      'no-referrer'
-    );
-  });
-
-  it('should set Cross-Origin-Resource-Policy header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Cross-Origin-Resource-Policy',
-      'same-origin'
-    );
-  });
-
-  it('should set Cross-Origin-Opener-Policy header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Cross-Origin-Opener-Policy',
-      'same-origin'
-    );
-  });
-
-  it('should set Cross-Origin-Embedder-Policy header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'Cross-Origin-Embedder-Policy',
-      'require-corp'
-    );
-  });
-
-  it('should set Origin-Agent-Cluster header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith('Origin-Agent-Cluster', '?1');
-  });
-
-  it('should set X-Content-Type-Options header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'X-Content-Type-Options',
-      'nosniff'
-    );
-  });
-
-  it('should set X-DNS-Prefetch-Control header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith('X-DNS-Prefetch-Control', 'off');
-  });
-
-  it('should set X-Download-Options header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith('X-Download-Options', 'noopen');
-  });
-
-  it('should set X-Frame-Options header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith('X-Frame-Options', 'SAMEORIGIN');
-  });
-
-  it('should set X-Permitted-Cross-Domain-Policies header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'X-Permitted-Cross-Domain-Policies',
-      'none'
-    );
-  });
-
-  it('should set X-XSS-Protection header', async () => {
-    await secure(req, res);
-    expect(res.setHeader).toHaveBeenCalledWith('X-XSS-Protection', '0');
-  });
-});
-
-describe('CSRF Middleware', () => {
-  let req: any;
-  let res: any;
-
-  beforeEach(() => {
-    req = {
-      method: 'GET', // Default method
-      body: {},
-      cookies: {},
-      headers: {},
-    };
-    res = {
-      cookie: jest.fn(),
-    };
-  });
-
-  it('should generate a CSRF token for GET requests', async () => {
-    req.cookies = undefined;
-    req.method = 'GET';
-
-    await csrf(req, res);
-
-    // Ensure the CSRF token is set in the request
-    expect(req.csrfToken).toBe('mock-token');
-
-    // Ensure the cookie is set
-    expect(res.cookie).toHaveBeenCalledWith(
-      'csrfToken',
-      'mock-token',
-      expect.objectContaining({
-        expires: expect.any(String),
-        secure: false, // `secure` will be false since the env is 'dev'
-        httpOnly: true,
-        sameSite: 'Strict',
-        priority: 'High',
-      })
-    );
-  });
-
-  it('should accept a valid CSRF token in POST requests', async () => {
-    req.method = 'POST';
-    req.cookies.csrfToken = 'valid-token';
-    req.body.csrfToken = 'valid-token'; // Simulating valid token
-
-    await expect(csrf(req, res)).resolves.toBeUndefined();
-  });
-
-  it('should reject with BadRequestError if CSRF token mismatch', async () => {
-    req.method = 'POST';
-    req.cookies.csrfToken = 'valid-token';
-    req.body.csrfToken = 'invalid-token';
-
-    await expect(csrf(req, res)).rejects.toThrow(
-      new BadRequestError('Invalid or missing CSRF token')
-    );
-  });
-
-  it('should reject with BadRequestError if CSRF token is missing', async () => {
-    req.method = 'POST';
-    req.cookies.csrfToken = 'valid-token';
-    req.body.csrfToken = undefined; // No token
-
-    await expect(csrf(req, res)).rejects.toThrow(
-      new BadRequestError('Invalid or missing CSRF token')
-    );
-  });
-
-  it('should set the CSRF token from cookies if present', async () => {
-    req.cookies = { csrfToken: 'existing-token' };
-
-    await csrf(req, res);
-
-    // Ensure that req.csrfToken is set to the token from cookies
-    expect(req.csrfToken).toBe('existing-token');
-
-    // Ensure no cookie is set because the CSRF token was already available in the cookies
-    expect(res.cookie).not.toHaveBeenCalled();
-  });
-
-  it('should handle case when cookies, body are undefined', async () => {
-    // Setting cookies, body to undefined
-    req.method = 'POST';
-    req.cookies = undefined;
-    req.body = undefined;
-
-    await expect(csrf(req, res)).rejects.toThrow(
-      new BadRequestError('Invalid or missing CSRF token')
-    );
   });
 });
 

@@ -16,6 +16,7 @@ import {
   isSQLite,
   isPostgreSQL,
   isArrOfArr,
+  isBool,
 } from '../../helpers';
 
 /**
@@ -180,11 +181,11 @@ export class Upsert<
   }
 
   /**
-   * Adds a single row to be inserted.
-   * Also initializes `columns` if not previously defined.
+   * Adds a single row to be inserted in the UPSERT operation.
    *
-   * @param row An object mapping column names to values.
-   * @returns This `Upsert` instance.
+   * @param row An object mapping column names to their corresponding values.
+   * @returns This `Upsert` instance to allow method chaining.
+   * @throws `QueryError` if the row is invalid, empty, has mismatched columns, or contains unsupported value types.
    */
   public row(row: Row): this {
     if (!isObj(row)) {
@@ -207,20 +208,12 @@ export class Upsert<
       this.columns = columns;
     }
 
-    const values = Object.values(row);
-    values.forEach((value) => {
-      if (!(isNull(value) || isStr(value) || isNum(value))) {
-        throw new QueryError(`Invalid UPSERT value: ${String(value)}`);
-      }
-    });
-
-    this.values.push(values);
+    this.values.push(Object.values(row));
     return this;
   }
 
   /**
    * Adds multiple rows to be inserted.
-   * Requires at least two rows.
    *
    * @param rows Array of row objects to insert.
    * @returns This `Upsert` instance.
@@ -228,10 +221,6 @@ export class Upsert<
   public rows(rows: Rows): this {
     if (!isArrOfObj(rows)) {
       throw new QueryError(`Invalid rows: ${String(rows)}`);
-    }
-
-    if (rows.length < 2) {
-      throw new QueryError(`Bulk insert requires at least 2 rows.`);
     }
 
     rows.forEach((row) => this.row(row));

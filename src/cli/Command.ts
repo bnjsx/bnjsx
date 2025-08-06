@@ -1,4 +1,4 @@
-import { isDefined, isUndefined, isObj, isStr } from "../helpers";
+import { isDefined, isUndefined, isObj, isStr } from '../helpers';
 
 /**
  * Represents a parsed parameter with a key (name) and its type (required, optional, or option).
@@ -17,20 +17,12 @@ type Parameters = Array<{ key: string; type: string }>;
 type Arguments = Array<{ key: string; value: string }>;
 
 /**
- * Represents a parsed option with a key (name) and its associated value (boolean).
- *
- * @property `key` The name of the option (e.g., 'verbose').
- * @property `value` The value of the option (true or false).
- */
-type Options = Array<{ key: string; value: string }>;
-
-/**
  * The result of validating command arguments, consisting of parsed arguments and options.
  *
  * @property `arguments` An array of parsed arguments.
  * @property `options` An array of parsed options.
  */
-type Result = { arguments: Arguments; options: Options };
+type Result = { arguments: Arguments; options: Set<string> };
 
 /**
  * Custom error class used in Command for handling command-related errors.
@@ -69,7 +61,7 @@ export abstract class Command {
     }
 
     // Regular expression to match required <!>, optional <?>, and options <-> patterns
-    const pattern = /<(\!|\?|\-)\s*([a-z0-9_]+)\s*>/g;
+    const pattern = /<(\!|\?)\s*([a-z0-9_]+)\s*>/g;
 
     // Array to store the parsed result (each parameter with its type and name)
     const result: { key: string; type: string }[] = [];
@@ -97,47 +89,34 @@ export abstract class Command {
    * @throws `CommandError` if there are too many arguments, missing required arguments, or unexpected options.
    */
   protected static validate(params: Parameters, args: Array<string>): Result {
+    const result: Result = {
+      arguments: new Array(),
+      options: new Set(),
+    };
+
+    result.options = new Set(args.filter((arg) => arg.startsWith('-')));
+    args = args.filter((arg) => !arg.startsWith('-'));
+
     // Check if the number of arguments exceeds the expected parameters
     if (args.length > params.length) {
       throw new CommandError(`Too many arguments provided`);
     }
 
-    const result = { arguments: [], options: [] };
-
     // Iterate through each parameter definition to validate the arguments
     for (let i = 0; i < params.length; i++) {
-      const type = params[i].type; // The type of the parameter (!, ?, or -)
+      const type = params[i].type; // The type of the parameter (!, ?)
       const param = params[i].key; // The name of the parameter
       const arg = args[i]; // The corresponding argument provided by the user
 
-      // Handle options (type '-')
-      if (type === "-") {
-        // Check if the argument matches the expected option format
-        if (isDefined(arg) && arg !== `-${param}`) {
-          throw new CommandError(`Unexpected option: ${arg}`);
-        }
-
-        // Add the option to the result, marking it as true if provided, false otherwise
-        result.options.push({ key: param, value: arg ? true : false });
-        continue;
-      }
-
       // Handle optional arguments (type '?')
-      if (type === "?") {
-        // If an option appears instead of a value, adjust the argument list and proceed
-        if (isDefined(arg) && arg.startsWith("-")) {
-          args = [...args.slice(0, i), arg, ...args.slice(i)];
-          result.arguments.push({ key: param, value: undefined });
-          continue;
-        }
-
+      if (type === '?') {
         // Add the optional argument to the result (value can be undefined)
         result.arguments.push({ key: param, value: arg });
         continue;
       }
 
       // Handle required arguments (type '!')
-      if (type === "!" && isDefined(arg) && !arg.startsWith("-")) {
+      if (type === '!' && isDefined(arg)) {
         // Add the required argument to the result
         result.arguments.push({ key: param, value: arg });
         continue;
@@ -202,13 +181,7 @@ export abstract class Command {
       );
     }
 
-    const option = this.result.options.find((option) => option.key === name);
-
-    if (isUndefined(option)) {
-      throw new CommandError(`Undefined option name: ${String(name)}`);
-    }
-
-    return option.value as any;
+    return this.result.options.has('-'.concat(name));
   }
 
   /**

@@ -93,12 +93,6 @@ describe('Insert', () => {
       expect(() => insert.row(emptyRow)).toThrow(QueryError);
     });
 
-    test('should throw for invalid value types', () => {
-      const rowWithInvalidValue = { id: 1, name: ['Invalid array value'] };
-
-      expect(() => insert.row(rowWithInvalidValue)).toThrow(QueryError);
-    });
-
     test('should set `this.columns` to row keys on first row', () => {
       const row = { id: 1, name: 'John' };
       insert.row(row);
@@ -144,11 +138,6 @@ describe('Insert', () => {
     test('should throw for non-array values', () => {
       const values = [1, 'hello world', {}, undefined, null, []];
       values.forEach((v) => expect(() => insert.rows(v)).toThrow(QueryError));
-    });
-
-    test('should throw for single insert', () => {
-      const rows = [{ id: 1, name: 'John Doe' }];
-      expect(() => insert.rows(rows)).toThrow(QueryError);
     });
   });
 

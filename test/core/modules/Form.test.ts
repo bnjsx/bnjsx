@@ -473,6 +473,7 @@ describe('Form', () => {
       res = {};
       form.encoded = jest.fn().mockResolvedValue(undefined);
       form.multipart = jest.fn().mockResolvedValue(undefined);
+      jest.spyOn(form, 'finalize');
     });
 
     test('should resolve without processing when content-type is not recognized', async () => {
@@ -496,11 +497,40 @@ describe('Form', () => {
       expect(form.encoded).not.toHaveBeenCalled();
     });
 
+    test('should call multipart() for multipart/form-data', async () => {
+      req.getHeader.mockReturnValue('multipart/form-data');
+      await expect(form.parse(req, res)).resolves.toBeUndefined();
+      expect(form.multipart).toHaveBeenCalled();
+      expect(form.encoded).not.toHaveBeenCalled();
+    });
+
     test('should set req and res properties correctly', async () => {
       req.getHeader.mockReturnValue('');
       await form.parse(req, res);
       expect(form.req).toBe(req);
       expect(form.res).toBe(res);
+    });
+
+    test('should call finalize when body is already parsed to avoid double parsing', async () => {
+      req.getHeader.mockReturnValue('application/json');
+      req[Form.BODY_PARSED] = true; // simulate body already parsed
+
+      await expect(form.parse(req, res)).resolves.toBeUndefined();
+      expect(form.finalize).toHaveBeenCalled();
+      expect(form.encoded).not.toHaveBeenCalled();
+      expect(form.multipart).not.toHaveBeenCalled();
+    });
+
+    test('should parse JSON and call finalize', async () => {
+      req.getHeader.mockReturnValue('application/json');
+      req.on = jest.fn((event, callback) => {
+        const data = JSON.stringify({ name: 'bnjsx' });
+        if (event === 'data') callback(Buffer.from(data));
+        if (event === 'end') callback();
+      });
+
+      await expect(form.parse(req, res)).resolves.toBeUndefined();
+      expect(form.finalize).toHaveBeenCalled();
     });
   });
 
@@ -671,7 +701,7 @@ describe('Form', () => {
       form.bb.emit('close');
 
       await expect(promise).resolves.toBeUndefined(); // Should not reject
-      expect(form.req.body).toBeUndefined(); // Should not be included
+      expect(form.req.body).toEqual({}); // Should not be included
     });
 
     it('should ignore unexpected files in ignore mode', async () => {
@@ -686,7 +716,7 @@ describe('Form', () => {
       form.bb.emit('close');
 
       await expect(promise).resolves.toBeUndefined(); // Should not reject
-      expect(form.req.body).toBeUndefined(); // Should not be included
+      expect(form.req.body).toEqual({}); // Should not be included
     });
 
     it('should add error for missing required file', async () => {

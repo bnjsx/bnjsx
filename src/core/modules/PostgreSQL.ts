@@ -204,7 +204,7 @@ export class PostgreSQL implements Driver {
           const postgre: Connection = {
             id: Symbol('Connection'),
             driver: this,
-            query(sql: string, values: Array<string | number>) {
+            query(sql: string, values: Array<string | number | boolean>) {
               return new Promise((resolve, reject) => {
                 if (!isStr(sql)) {
                   return reject(
@@ -219,6 +219,11 @@ export class PostgreSQL implements Driver {
                     );
                   }
 
+                  values = values.map((value) => {
+                    if (isBool(value)) return value ? 1 : 0;
+                    return value;
+                  });
+
                   values.forEach((value) => {
                     if (!isNum(value) && !isStr(value)) {
                       return reject(
@@ -229,6 +234,7 @@ export class PostgreSQL implements Driver {
                 }
 
                 let counter = 1;
+
                 client
                   .query(
                     sql.replace(/\?/g, () => `$${counter++}`),

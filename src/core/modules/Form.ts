@@ -1,11 +1,5 @@
 import { extname, isAbsolute, resolve as resolver } from 'path';
-import {
-  isArrOfStr,
-  isBool,
-  isEmptyArr,
-  isEmptyStr,
-  toSize,
-} from '../../helpers';
+import { isArrOfStr, isBool, isEmptyStr, toSize } from '../../helpers';
 import { isArr, isFunc, isInt, isObj, isStr } from '../../helpers';
 import { createWriteStream, WriteStream } from 'fs';
 import { Request } from './Request';
@@ -15,6 +9,7 @@ import { config } from '../../config';
 import { unlink } from 'fs/promises';
 import { BadRequestError } from '../../errors';
 import busboy, { Busboy } from 'busboy';
+import { json } from '../middlewares';
 
 /** One Kilobyte (KB) is equal to 1024 bytes. */
 export const KB = 1024; // Kilobyte
@@ -95,6 +90,25 @@ export interface FileOptions {
 }
 
 /**
+ * A test function used to validate an individual field.
+ *
+ * This function receives the value of the field and the entire request body,
+ * allowing for complex validations that may depend on other fields.
+ *
+ * > Note: The `body` parameter is passed by reference. You can mutate it
+ * (e.g., cast values) during validation if needed.
+ *
+ * @template B - Type of the values in the body object (optional).
+ * @param value - The value of the field to validate. Can be a string or an array of strings.
+ * @param body - The entire parsed request body. Shared across all tests.
+ * @returns `true` if the value passes validation, `false` otherwise.
+ */
+export type TestFn = <B extends unknown>(
+  value: string | string[],
+  body: Record<string, B>
+) => boolean;
+
+/**
  * Represents a validation rule for form fields.
  *
  * The `test` function is used to validate a field value, returning `true` if
@@ -105,18 +119,12 @@ export interface Tester {
   /**
    * Validates the given field value.
    *
-   * @template B - The expected type for the `body` values, which can be
-   *               `undefined`, `string`, an array of strings, or a `File`.
-   *
    * @param value - The field value to be tested.
    * @param body - The full request body containing other fields.
    *
    * @returns Returns `true` if the value is valid, otherwise `false`.
    */
-  test: <B extends undefined | string | Array<string> | File>(
-    value: string,
-    body: Record<string, B>
-  ) => boolean;
+  test: TestFn;
 
   /** Error message to display if validation fails. */
   message: string;
@@ -128,7 +136,7 @@ export interface Tester {
  * This type contains essential details about an uploaded file, including its
  * size, MIME type, storage path, and original name.
  */
-export interface File {
+export interface UploadedFile {
   /** File size in bytes after validation. */
   size: number;
 
@@ -165,6 +173,9 @@ export class FormError extends Error {}
  * error handling.
  */
 export class Form {
+  /** Internal marker to indicate that the request body has already been parsed. */
+  public static BODY_PARSED = Symbol('formParsed');
+
   /**
    * The mode of the form, determining how to handle unexpected files and fields.
    * - `strict`: Reject unexpected files and fields.
@@ -247,7 +258,7 @@ export class Form {
    * @param name - The name of the file field.
    * @param data - The file object containing size, type, path, and name.
    */
-  private addFile(name: string, data: File): void {
+  private addFile(name: string, data: UploadedFile): void {
     if (!this.req.body) this.req.body = {};
 
     if (isObj(this.req.body[name])) {
@@ -286,24 +297,32 @@ export class Form {
   }
 
   /**
-   * Validates all field values in the request body against their respective test functions.
+   * Finalizes the parsing process by validating all registered fields.
    *
-   * - Iterates through all defined fields and applies validation tests.
-   * - If a test fails, the corresponding error message is registered.
-   *
-   * @returns This function does not return a value.
+   * - Sets the BODY_PARSED flag.
+   * - Applies validation tests to all defined fields.
+   * - Collects and registers validation errors.
+   * - Resolves or rejects the form processing depending on result.
    */
-  private testFields(): true {
-    Object.keys(this.fields).forEach((key) => {
-      this.fields[key].forEach((tester) => {
-        const value = this.req.body ? this.req.body[key] : undefined;
-        if (!tester.test(value, this.req.body || {})) {
-          this.addError(key, tester.message);
-        }
-      });
-    });
+  private finalize(resolve: () => void, reject: (e: unknown) => void): void {
+    try {
+      this.req[Form.BODY_PARSED] = true;
+      if (!isObj(this.req.body)) this.req.body = {};
 
-    return true;
+      for (const key of Object.keys(this.fields)) {
+        for (const tester of this.fields[key]) {
+          const value = this.req.body[key];
+          if (!tester.test(value, this.req.body)) {
+            this.addError(key, tester.message);
+          }
+        }
+      }
+
+      resolve();
+    } catch (err) {
+      this.issue = true;
+      reject(err);
+    }
   }
 
   /**
@@ -336,7 +355,9 @@ export class Form {
               if (!this.fields[key]) {
                 if (this.mode === 'strict') {
                   this.issue = true;
-                  throw new BadRequestError(`Unexpected field '${key}'`);
+                  return reject(
+                    new BadRequestError(`Unexpected field '${key}'`)
+                  );
                 }
 
                 // Ignore unexpected fields
@@ -346,7 +367,7 @@ export class Form {
               this.addField(key, value);
             }
 
-            this.testFields() && resolve();
+            this.finalize(resolve, reject);
           })
         );
       });
@@ -375,7 +396,7 @@ export class Form {
         (e) => !this.issue && ((this.issue = true), reject(e))
       );
 
-      this.bb.on('close', () => !this.issue && this.testFields() && resolve());
+      this.bb.on('close', () => !this.issue && this.finalize(resolve, reject));
 
       this.res.on('finish', () => {
         if (this.issue) {
@@ -430,7 +451,7 @@ export class Form {
           if (this.files[name].required) {
             this.issue = true;
             this.addError(name, this.files[name].messages.required);
-            return readStream.resume(), this.testFields() && resolve();
+            return readStream.resume(), this.finalize(resolve, reject);
           }
 
           readStream.resume();
@@ -444,7 +465,7 @@ export class Form {
         if (this.count[name] > this.files[name].count) {
           this.issue = true;
           this.addError(name, this.files[name].messages.count);
-          return readStream.resume(), this.testFields() && resolve();
+          return readStream.resume(), this.finalize(resolve, reject);
         }
 
         // Type Check
@@ -452,7 +473,7 @@ export class Form {
           if (!this.files[name].type.includes(mimeType)) {
             this.issue = true;
             this.addError(name, this.files[name].messages.type);
-            return readStream.resume(), this.testFields() && resolve();
+            return readStream.resume(), this.finalize(resolve, reject);
           }
         }
 
@@ -476,7 +497,7 @@ export class Form {
             if (size > this.files[name].size.max) {
               this.issue = true;
               this.addError(name, this.files[name].messages.size.max);
-              return readStream.resume(), this.testFields() && resolve();
+              return readStream.resume(), this.finalize(resolve, reject);
             }
           }
         });
@@ -486,7 +507,7 @@ export class Form {
             if (size < this.files[name].size.min) {
               this.issue = true;
               this.addError(name, this.files[name].messages.size.min);
-              return readStream.resume(), this.testFields() && resolve();
+              return readStream.resume(), this.finalize(resolve, reject);
             }
 
             this.addFile(name, { name: filename, path, size, type: mimeType });
@@ -512,17 +533,33 @@ export class Form {
    */
   public parse(req: Request, res: Response): Promise<void> {
     return new Promise((resolve, reject) => {
-      const header = req.getHeader('content-type') || '';
-
       this.res = res;
       this.req = req;
 
-      if (header.includes('application/x-www-form-urlencoded')) {
-        return resolve(this.encoded());
+      const header = req.getHeader('content-type') || '';
+
+      if (!req[Form.BODY_PARSED]) {
+        if (header.includes('application/x-www-form-urlencoded')) {
+          return resolve(this.encoded());
+        }
+
+        if (header.includes('multipart/form-data')) {
+          return resolve(this.multipart());
+        }
+
+        if (header.includes('application/json')) {
+          return json(req, res)
+            .then(() => this.finalize(resolve, reject))
+            .catch(reject);
+        }
       }
 
-      if (header.includes('multipart/form-data')) {
-        return resolve(this.multipart());
+      if (
+        header.includes('application/x-www-form-urlencoded') ||
+        header.includes('multipart/form-data') ||
+        header.includes('application/json')
+      ) {
+        return this.finalize(resolve, reject);
       }
 
       return resolve();

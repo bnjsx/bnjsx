@@ -2,7 +2,15 @@ import { createConnection } from 'mysql2/promise';
 import { Connection, Driver } from './Driver';
 
 // Helpers
-import { isArr, isDefined, isNum, isObj, isStr } from '../../helpers';
+import {
+  isArr,
+  isBool,
+  isDefined,
+  isNum,
+  isObj,
+  isStr,
+  isTrue,
+} from '../../helpers';
 
 // Erros
 import {
@@ -286,7 +294,7 @@ export class MySQL implements Driver {
           const mysql: Connection = {
             id: Symbol('Connection'),
             driver: this,
-            query(sql: string, values: Array<string | number>) {
+            query(sql: string, values: Array<string | number | boolean>) {
               return new Promise((resolve, reject) => {
                 if (!isStr(sql)) {
                   return reject(
@@ -300,6 +308,11 @@ export class MySQL implements Driver {
                       new QueryError(`Invalid query values: ${String(values)}`)
                     );
                   }
+
+                  values = values.map((value) => {
+                    if (isBool(value)) return value ? 1 : 0;
+                    return value;
+                  });
 
                   values.forEach((value) => {
                     if (!isNum(value) && !isStr(value)) {

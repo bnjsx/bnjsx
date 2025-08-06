@@ -2,6 +2,7 @@ import { IncomingMessage } from 'http';
 import { isStr } from '../../helpers';
 import { Response } from './Response';
 import mime from 'mime-types';
+import { config } from '../../config';
 
 /**
  * Custom error class for request-related errors.
@@ -33,6 +34,15 @@ export interface Request<
   /** The port number used for the request. */
   port: string;
 
+  /** The resolved client IP address. */
+  ip: string;
+
+  /** The request path plus query string. */
+  href: string;
+
+  /** The base URL of the request. */
+  base: string;
+
   /** The request path without query parameters. */
   path: string;
 
@@ -49,7 +59,7 @@ export interface Request<
   errors: Record<string, Array<string>>;
 
   /** Allows additional dynamic properties. */
-  [key: string]: any;
+  [key: string | symbol]: any;
 
   /**
    * Checks if the request's `Content-Type` header matches a given MIME type.
@@ -74,7 +84,81 @@ export interface Request<
    * @returns The header value as a string, an array of strings, or `undefined` if not present.
    */
   getHeader: (name: string) => string | string[];
+
+  /**
+   * Retrieves the client’s IP address (IPv4 only).
+   * Normalizes `::ffff:127.0.0.1` to `127.0.0.1`.
+   *
+   * @returns The client IPv4 address as a string.
+   */
+  getIp(): string;
+
+  /**
+   * Gets the base app URL from config (e.g., `https://example.com`).
+   * Omits port if using default (80 for HTTP, 443 for HTTPS).
+   *
+   * @returns The base URL as a string.
+   */
+  getBase(): string;
+
+  /**
+   * Checks if the incoming request is an AJAX request.
+   *
+   * This method inspects the `X-Requested-With` header, which is a common convention
+   * used by many libraries (such as `jQuery` and `axios`) to indicate an AJAX request.
+   *
+   * @returns `true` if the request has the header `X-Requested-With` set to `XMLHttpRequest` (case-insensitive), otherwise `false`.
+   */
+  isAjax(): boolean;
 }
+
+// @ts-ignore
+IncomingMessage.prototype.isAjax = function (): boolean {
+  const xReq = this.getHeader('x-requested-with');
+  return xReq?.toLowerCase() === 'xmlhttprequest';
+};
+
+// @ts-ignore
+IncomingMessage.prototype.getIp = function (): string {
+  const forwarded = this.getHeader('x-forwarded-for');
+  let ip = '';
+
+  if (typeof forwarded === 'string') {
+    ip = forwarded.split(',')[0].trim();
+  } else {
+    ip = this.socket?.remoteAddress || '';
+  }
+
+  // Normalize IPv6-embedded IPv4 and localhost
+  if (ip.startsWith('::ffff:')) return ip.replace('::ffff:', '');
+  else if (ip === '::1') return '127.0.0.1';
+
+  return ip || '0.0.0.0';
+};
+
+// @ts-ignore
+IncomingMessage.prototype.getBase = function () {
+  const { host, port, protocol } = config().loadSync();
+
+  const isDefaultPort =
+    (protocol === 'http' && port === 80) ||
+    (protocol === 'https' && port === 443);
+
+  return isDefaultPort
+    ? `${protocol}://${host}`
+    : `${protocol}://${host}:${port}`;
+};
+
+// @ts-ignore
+IncomingMessage.prototype.getHeader = function (
+  name: string
+): string | string[] | undefined {
+  if (!isStr(name)) {
+    throw new RequestError('Invalid header name');
+  }
+
+  return this.headers[name.toLowerCase()];
+};
 
 // @ts-ignore
 IncomingMessage.prototype.type = function (name: string): boolean {
@@ -94,15 +178,4 @@ IncomingMessage.prototype.accepts = function (name: string): boolean {
     .split(',')
     .map((type) => type.trim())
     .some(($type) => $type === type || $type.includes(type));
-};
-
-// @ts-ignore
-IncomingMessage.prototype.getHeader = function (
-  name: string
-): string | string[] | undefined {
-  if (!isStr(name)) {
-    throw new RequestError('Invalid header name');
-  }
-
-  return this.headers[name.toLowerCase()];
 };

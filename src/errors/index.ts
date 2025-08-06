@@ -193,3 +193,31 @@ export class ServerError extends Error {
     super(message ? message : 'Internal server error');
   }
 }
+
+/**
+ * Represents a service unavailable (503).
+ * @extends Error
+ */
+export class MaintenanceError extends Error {
+  /**
+   * Creates an instance of MaintenanceError.
+   * @param message - Optional custom error message. Defaults to 'Internal server error'.
+   */
+  constructor(message?: string) {
+    super(message ? message : 'Service unavailable');
+  }
+}
+
+/**
+ * Represents a `Validator` related error
+ * @extends Error
+ */
+export class ValidatorError extends Error {
+  /**
+   * Creates an instance of ValidatorError.
+   * @param message - Optional custom error message. Defaults to 'Internal server error'.
+   */
+  constructor(message?: string) {
+    super(message ? message : 'Validator issue');
+  }
+}

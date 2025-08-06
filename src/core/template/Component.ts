@@ -30,6 +30,7 @@ import {
   isStr,
   isUndefined,
   isPromise,
+  warn,
 } from '../../helpers';
 
 /**
@@ -198,15 +199,35 @@ export class Component {
       .filter((item) => item.trim() !== '')
       .forEach((exp) => {
         if (isUndefined(value)) {
-          throw new ComponentError(
-            `Cannot read properties of undefined (reading '${exp}') in '${this.name}' at line number ${line}`
-          );
+          if (this.config.env === 'dev') {
+            warn(
+              `Heads up: '${exp}' was accessed, but its parent is undefined.`,
+              {
+                reason: `'${exp}' cannot be read because the parent object is undefined.`,
+                context: `${resolvePath(this.path)}:${line}`,
+                note: 'This is usually safe if optional chaining is intended.',
+              },
+              'ComponentInfo'
+            );
+          }
+
+          return undefined;
         }
 
         if (isNull(value)) {
-          throw new ComponentError(
-            `Cannot read properties of null (reading '${exp}') in '${this.name}' at line number ${line}`
-          );
+          if (this.config.env === 'dev') {
+            warn(
+              `Heads up: '${exp}' was accessed, but its parent is null.`,
+              {
+                reason: `'${exp}' cannot be read because the parent object is null.`,
+                context: `${resolvePath(this.path)}:${line}`,
+                note: 'This is usually safe if optional chaining is intended.',
+              },
+              'ComponentInfo'
+            );
+          }
+
+          return null;
         }
 
         if (isBracketExp(exp)) {
@@ -216,15 +237,35 @@ export class Component {
 
           indexes.forEach((index) => {
             if (isUndefined(value)) {
-              throw new ComponentError(
-                `Cannot read indexes of undefined (reading '${index}') in '${this.name}' at line number ${line}`
-              );
+              if (this.config.env === 'dev') {
+                warn(
+                  `Heads up: index [${index}] was accessed, but its parent is undefined.`,
+                  {
+                    reason: `Cannot read index [${index}] because the parent is undefined.`,
+                    context: `${resolvePath(this.path)}:${line}`,
+                    note: 'Usually harmless if optional chaining is expected.',
+                  },
+                  'ComponentInfo'
+                );
+              }
+
+              return undefined;
             }
 
             if (isNull(value)) {
-              throw new ComponentError(
-                `Cannot read indexes of null (reading '${index}') in '${this.name}' at line number ${line}`
-              );
+              if (this.config.env === 'dev') {
+                warn(
+                  `Heads up: index [${index}] was accessed, but its parent is null.`,
+                  {
+                    reason: `Cannot read index [${index}] because the parent is null.`,
+                    context: `${resolvePath(this.path)}:${line}`,
+                    note: 'Usually harmless if optional chaining is expected.',
+                  },
+                  'ComponentInfo'
+                );
+              }
+
+              return null;
             }
 
             value = value[Number(index)];
@@ -532,7 +573,9 @@ export class Component {
       if (!hasKey(this.replacements, node.key)) {
         return reject(
           new ComponentError(
-            `No replacement found for '${node.key}' in '${this.name}' at line number ${node.line}`
+            `No replacement found for '${node.key}' in '${resolvePath(
+              this.path
+            )}:${node.line}'`
           )
         );
       }
@@ -570,7 +613,9 @@ export class Component {
           if (error.code !== 'ENOENT') return reject(error);
           reject(
             new ComponentError(
-              `Undefined component '${name}' included in '${this.name}' at line number ${node.line}`
+              `Undefined component '${name}' included in '${resolvePath(
+                this.path
+              )}:${node.line}'`
             )
           );
         });
@@ -598,7 +643,9 @@ export class Component {
           if (!isArr(collection)) {
             return reject(
               new ComponentError(
-                `Invalid collection type in '${this.name}' at line number ${node.line}`
+                `Invalid collection type in '${resolvePath(this.path)}:${
+                  node.line
+                }'`
               )
             );
           }
@@ -870,7 +917,11 @@ export class Component {
         })
         .catch((error) => {
           if (error.code !== 'ENOENT') return reject(error);
-          reject(new ComponentError(`Undefined component '${this.name}'`));
+          reject(
+            new ComponentError(
+              `Undefined component '${resolvePath(this.path)}'`
+            )
+          );
         });
     });
   }

@@ -85,7 +85,7 @@ describe('Update', () => {
       update.state.table = ''; // Invalid table name
       update.state.columns = ['name'];
       update.values = ['John'];
-      update.state.condition = new Condition(update);
+      update.state.condition = new Condition(mock.connection().driver);
 
       expect(() => update.build()).toThrow(QueryError);
       expect(() => update.build()).toThrow('Invalid UPDATE table: ');
@@ -94,7 +94,7 @@ describe('Update', () => {
     it('should throw QueryError if there are no columns to update', () => {
       update.table('users');
       update.values = ['John'];
-      update.state.condition = new Condition(update);
+      update.state.condition = new Condition(mock.connection().driver);
 
       expect(() => update.build()).toThrow(QueryError);
       expect(() => update.build()).toThrow('Invalid UPDATE columns');
@@ -103,7 +103,7 @@ describe('Update', () => {
     it('should throw QueryError if there are no values to update', () => {
       update.table('users');
       update.state.columns = ['name'];
-      update.state.condition = new Condition(update);
+      update.state.condition = new Condition(mock.connection().driver);
 
       expect(() => update.build()).toThrow(QueryError);
       expect(() => update.build()).toThrow('Invalid UPDATE values');
@@ -164,12 +164,26 @@ describe('Update', () => {
     it('should throw QueryError if condition is not a function', () => {
       expect(() => update.where('invalid' as any)).toThrow(QueryError);
     });
+
+    it('should accept condition instances as well', () => {
+      const condition = new Condition(mock.connection().driver);
+      condition.col('age').lessThan(12).and().col('location').like('paris');
+      const query = update
+        .table('table')
+        .where(condition)
+        .set({ key: 'value' });
+
+      expect(query.build()).toBe(
+        'UPDATE table SET key = ? WHERE age < ? AND location LIKE ?;'
+      );
+      expect(query.values).toEqual(['value', 12, 'paris']);
+    });
   });
 
   describe('.and()', () => {
     it('should append AND to the condition if it exists', () => {
       // Defined condition
-      update.state.condition = new Condition(update);
+      update.state.condition = new Condition(mock.connection().driver);
 
       // Spy on update.condition.and
       const spy = jest.spyOn(update.state.condition, 'and');
@@ -191,7 +205,7 @@ describe('Update', () => {
   describe('.or()', () => {
     it('should append OR to the condition if it exists', () => {
       // Defined condition
-      update.state.condition = new Condition(update);
+      update.state.condition = new Condition(mock.connection().driver);
 
       // Spy on update.condition.or
       const spy = jest.spyOn(update.state.condition, 'or');
@@ -213,7 +227,7 @@ describe('Update', () => {
   describe('.paren()', () => {
     it('should adds parentheses around conditions', () => {
       // Defined condition
-      update.state.condition = new Condition(update);
+      update.state.condition = new Condition(mock.connection().driver);
 
       // Spy on update.condition.paren
       const spy = jest.spyOn(update.state.condition, 'paren');

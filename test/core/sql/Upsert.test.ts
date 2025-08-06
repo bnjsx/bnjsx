@@ -81,11 +81,6 @@ describe('Upsert', () => {
       expect(() => upsert.row({})).toThrow(QueryError);
     });
 
-    it('should throw for invalid value types', () => {
-      const row = { id: 1, name: ['invalid'] };
-      expect(() => upsert.row(row)).toThrow(QueryError);
-    });
-
     it('should accept null, string and number values', () => {
       const row = { id: 1, name: null, age: 30 };
       upsert.row(row);
@@ -111,10 +106,6 @@ describe('Upsert', () => {
       [null, undefined, 'string', 123, [{}, null]].forEach((invalid) => {
         expect(() => upsert.rows(invalid)).toThrow(QueryError);
       });
-    });
-
-    it('should throw if rows length < 2', () => {
-      expect(() => upsert.rows([{ id: 1, name: 'John' }])).toThrow(QueryError);
     });
 
     it('should throw if any row has mismatched columns', () => {

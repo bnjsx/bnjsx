@@ -1,4 +1,4 @@
-import { ASC, DESC, Seeder, Select } from '../../../src/core';
+import { ASC, Condition, DESC, Seeder, Select } from '../../../src/core';
 import { ref } from '../../../src/core';
 
 const mock = {
@@ -235,6 +235,18 @@ describe('Select', () => {
         'Invalid JOIN condition: invalid condition'
       );
     });
+
+    it('should accept a condition instance', () => {
+      const condition = new Condition(mock.connection().driver);
+      condition.col('users.id').equal(ref('orders.user_id'));
+
+      const query = select.from('users').join('orders', condition);
+      expect(query.build()).toBe(
+        'SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id;'
+      );
+
+      expect(query.values).toEqual([]);
+    });
   });
 
   describe('leftJoin', () => {
@@ -263,6 +275,18 @@ describe('Select', () => {
         'Invalid JOIN condition: invalid condition'
       );
     });
+
+    it('should accept a condition instance', () => {
+      const condition = new Condition(mock.connection().driver);
+      condition.col('users.id').equal(ref('orders.user_id'));
+
+      const query = select.from('users').leftJoin('orders', condition);
+      expect(query.build()).toBe(
+        'SELECT * FROM users LEFT JOIN orders ON users.id = orders.user_id;'
+      );
+
+      expect(query.values).toEqual([]);
+    });
   });
 
   describe('rightJoin', () => {
@@ -290,6 +314,18 @@ describe('Select', () => {
       expect(() => select.rightJoin('orders', 'invalid condition')).toThrow(
         'Invalid JOIN condition: invalid condition'
       );
+    });
+
+    it('should accept a condition instance', () => {
+      const condition = new Condition(mock.connection().driver);
+      condition.col('users.id').equal(ref('orders.user_id'));
+
+      const query = select.from('users').rightJoin('orders', condition);
+      expect(query.build()).toBe(
+        'SELECT * FROM users RIGHT JOIN orders ON users.id = orders.user_id;'
+      );
+
+      expect(query.values).toEqual([]);
     });
   });
 
@@ -454,6 +490,24 @@ describe('Select', () => {
         select.from('users').where().build();
       }).toThrow('Invalid SELECT condition: undefined');
     });
+
+    it('should accept a condition instance', () => {
+      const condition = new Condition(mock.connection().driver);
+
+      condition
+        .col('age')
+        .greaterThanOrEqual(44)
+        .and()
+        .col('city')
+        .in('paris', 'rabat');
+
+      const query = select.from('users').where(condition);
+      expect(query.build()).toBe(
+        'SELECT * FROM users WHERE age >= ? AND city IN (?, ?);'
+      );
+
+      expect(query.values).toEqual([44, 'paris', 'rabat']);
+    });
   });
 
   describe('and', () => {
@@ -549,7 +603,6 @@ describe('Select', () => {
         'SELECT * FROM users WHERE ((status = ? OR status = ?) AND city = ?);'
       );
 
-      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['inactive', 'banned', 'Tokyo']);
     });
 
@@ -584,6 +637,24 @@ describe('Select', () => {
         select.from('sales').having().build();
       }).toThrow('Invalid HAVING condition: undefined');
     });
+
+    it('should accept a condition instance', () => {
+      const condition = new Condition(mock.connection().driver);
+
+      condition
+        .col('age')
+        .greaterThanOrEqual(44)
+        .and()
+        .col('city')
+        .in('paris', 'rabat');
+
+      const query = select.from('users').having(condition);
+      expect(query.build()).toBe(
+        'SELECT * FROM users HAVING age >= ? AND city IN (?, ?);'
+      );
+
+      expect(query.values).toEqual([44, 'paris', 'rabat']);
+    });
   });
 
   describe('union', () => {
@@ -601,7 +672,6 @@ describe('Select', () => {
           'SELECT * FROM users WHERE membership = ?;'
       );
 
-      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['gold', 'vip']);
     });
 
@@ -631,7 +701,6 @@ describe('Select', () => {
           'UNION ' +
           'SELECT * FROM users WHERE membership = ?;'
       );
-      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['gold', 'vip', 'platinum']);
     });
   });
@@ -652,7 +721,6 @@ describe('Select', () => {
           'UNION ALL ' +
           'SELECT * FROM users WHERE membership = ?;'
       );
-      console.log(select.get.values(), select.get.query());
       expect(select.values).toEqual(['gold', 'vip']);
     });
 
@@ -684,8 +752,6 @@ describe('Select', () => {
           'UNION ALL ' +
           'SELECT * FROM users WHERE membership = ?;'
       );
-      console.log(select.get.values(), select.get.query());
-
       expect(select.values).toEqual(['gold', 'vip', 'platinum']);
     });
   });

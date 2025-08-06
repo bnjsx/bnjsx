@@ -3,7 +3,7 @@ import { createReadStream, ReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { NotFoundError } from '../../errors';
 import { Request } from './Request';
-import { ranger } from './App';
+import { ranger } from '../middlewares/asset';
 import { render } from '../template/Component';
 import mime from 'mime-types';
 
@@ -17,7 +17,9 @@ import {
   isBuffer,
   isChildOf,
   isInt,
+  UTC,
 } from '../../helpers';
+import { FLASH_GET_KEY, FLASH_SET_KEY } from '../middlewares/flash';
 
 /**
  * Represents options for setting cookies in HTTP responses.
@@ -168,11 +170,10 @@ export interface Response extends ServerResponse {
   /**
    * Redirects to the specified URL.
    *
-   * @param url - The target URL to redirect to.
-   * @returns Resolves when the response is sent, rejects if the URL is invalid.
-   * @throws `ResponseError` if the provided URL is not a valid string.
+   * @returns A Redirector instance for chaining redirect operations.
+   * @throws `ResponseError` if the provided URL is invalid.
    */
-  redirect: (url: string) => Promise<void>;
+  redirect: (to?: string) => Redirector;
 
   /**
    * Sets the HTTP status code and message for the response.
@@ -213,6 +214,16 @@ export interface Response extends ServerResponse {
   json: (data: Record<string, unknown> | unknown[]) => Promise<void>;
 
   /**
+   * Sends an HTML response.
+   *
+   * This method sets the `Content-Type` header to `text/html`
+   *
+   * @param page - The html page to be sent.
+   * @returns A promise that resolves after sending the response.
+   */
+  html: (page: string) => Promise<void>;
+
+  /**
    * Sets a cookie on the response.
    *
    * @param name - The name of the cookie.
@@ -248,6 +259,107 @@ export interface Response extends ServerResponse {
  * Represents an error related to response handling.
  */
 export class ResponseError extends Error {}
+
+/**
+ * The Redirector class provides a clean, chainable API for performing HTTP redirects,
+ * optionally including flash messages using cookies.
+ *
+ * @example
+ *   redirect().back().with('Something went wrong', 'error').send();
+ */
+export class Redirector {
+  private url: string | null = null;
+
+  constructor(private req: Request, private res: Response) {}
+
+  /**
+   * Redirects to the `Referer` header if available, otherwise to a fallback path.
+   *
+   * @param fallback - Optional fallback path if no valid referer is present. Defaults to '/'.
+   * @returns The current instance for chaining.
+   */
+  public back(fallback?: string): this {
+    if (!isStr(fallback)) fallback = '/';
+
+    const referer =
+      this.req.getHeader('referer') || this.req.getHeader('referrer');
+
+    try {
+      const { pathname, search, protocol } = new URL(referer.toString());
+
+      if (!['http:', 'https:'].includes(protocol)) {
+        throw new Error('Invalid protocol');
+      }
+
+      this.url = pathname + search;
+    } catch (e) {
+      this.url = fallback;
+    }
+
+    return this;
+  }
+
+  /**
+   * Sets the redirect destination to a specific URL.
+   *
+   * @param url - The absolute or relative URL to redirect to.
+   * @returns The current instance for chaining.
+   * @throws ResponseError if the URL is invalid.
+   */
+  public to(url: string): this {
+    if (!isStr(url)) {
+      throw new ResponseError('Invalid redirect url');
+    }
+
+    this.url = url;
+    return this;
+  }
+
+  /**
+   * Adds a flash message to the request for use in the next response.
+   * Messages are stored in a cookie and cleared after one use.
+   *
+   * @param message - The message to display (e.g., "Update successful").
+   * @param type - The message category/type (e.g., 'success', 'error'). Defaults to 'error'.
+   * @returns The current instance for chaining.
+   */
+  public with(
+    message: string,
+    type: 'error' | 'info' | 'success' = 'error'
+  ): this {
+    if (!this.req[FLASH_SET_KEY]) this.req[FLASH_SET_KEY] = [];
+
+    this.req[FLASH_SET_KEY].push({ type, message });
+
+    this.res.cookie('flash', JSON.stringify(this.req[FLASH_SET_KEY]), {
+      path: '/',
+      httpOnly: true,
+      expires: UTC.future.minute(10),
+    });
+
+    return this;
+  }
+
+  /**
+   * Sends the redirect response to the client.
+   *
+   * - Sets the HTTP `Location` header to the specified URL.
+   * - Sets the status code to the given value or defaults to 302.
+   * - Sends any pending flash cookies.
+   *
+   * @param code - Optional status code to use (default is 302).
+   * @returns A promise that resolves when the response is sent.
+   */
+  public async send(code?: number): Promise<void> {
+    if (!isInt(code)) code = 302;
+    if (!this.url) this.url = '/';
+
+    this.res.setHeader('Location', this.url);
+    this.res.status(code);
+
+    await this.res.send();
+  }
+}
 
 // @ts-ignore
 ServerResponse.prototype.getMessage = function (code: number): string {
@@ -461,16 +573,10 @@ ServerResponse.prototype.stream = function (read: ReadStream): Promise<void> {
 };
 
 // @ts-ignore
-ServerResponse.prototype.redirect = function (url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (!isStr(url)) {
-      return reject(new ResponseError('Invalid redirect url'));
-    }
-
-    this.setHeader('Location', url);
-    this.status(301);
-    return resolve(this.send());
-  });
+ServerResponse.prototype.redirect = function (to?: string): Redirector {
+  const redirect = new Redirector(this.request, this);
+  if (isStr(to)) redirect.to(to);
+  return redirect;
 };
 
 // @ts-ignore
@@ -498,12 +604,31 @@ ServerResponse.prototype.render = function (
   replacements?: Record<string, string>
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    const flash = this.request[FLASH_GET_KEY] || [];
+    const csrf = this.request.csrfToken;
+
+    if (!isObj(locals)) locals = {};
+    if (isArr(locals.flash)) flash.push(...locals.flash);
+
+    locals.flash = flash;
+    locals.csrf = csrf;
+
     render(path, locals, replacements)
       .then((content) => {
         this.setHeader('Content-Type', 'text/html');
         resolve(this.send(content));
       })
       .catch(reject);
+  });
+};
+
+// @ts-ignore
+ServerResponse.prototype.html = function (page: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!isStr(page)) return reject(new ResponseError('Invalid html page'));
+
+    this.setHeader('Content-Type', 'text/html');
+    resolve(this.send(page));
   });
 };
 
@@ -590,8 +715,18 @@ ServerResponse.prototype.cookie = function (
     cookie.push(`Priority=${options.priority}`);
   }
 
-  // Set the cookie header
-  this.setHeader('Set-Cookie', cookie.join('; '));
+  // Set the cookie header (multi-cookie safe)
+  const existing = this.getHeader('Set-Cookie');
+  const current = cookie.join('; ');
+
+  if (existing) {
+    const cookies = isArr(existing) ? existing : [existing];
+    cookies.push(current);
+    this.setHeader('Set-Cookie', cookies);
+  } else {
+    this.setHeader('Set-Cookie', current);
+  }
+
   return this;
 };
 

@@ -143,6 +143,20 @@ describe('SQLite Driver', () => {
         ).rejects.toThrow(QueryError);
       });
 
+      describe('connection.query single value binding', () => {
+        const values = [1, true, false, 'hello'];
+
+        for (const value of values) {
+          it(`should not throw when binding value: ${JSON.stringify(
+            value
+          )}`, async () => {
+            await expect(
+              connection.query('SELECT * FROM test WHERE id = ?', [value])
+            ).resolves.not.toThrow();
+          });
+        }
+      });
+
       it('should reject with QueryError for invalid query', async () => {
         await expect(connection.query('INVALID SQL QUERY')).rejects.toThrow(
           QueryError

@@ -5,11 +5,10 @@ describe('Command', () => {
 
   describe('parse', () => {
     it('parses syntax with required, optional, and option parameters', () => {
-      const syntax = '<! name> <? age> <- verbose>';
+      const syntax = '<! name> <? age>';
       const expected = [
         { key: 'name', type: '!' },
         { key: 'age', type: '?' },
-        { key: 'verbose', type: '-' },
       ];
 
       expect(Command.parse(syntax)).toEqual(expected);
@@ -29,15 +28,6 @@ describe('Command', () => {
       const expected = [
         { key: 'age', type: '?' },
         { key: 'gender', type: '?' },
-      ];
-      expect(Command.parse(syntax)).toEqual(expected);
-    });
-
-    it('parses syntax with only options', () => {
-      const syntax = '<- verbose> <- debug>';
-      const expected = [
-        { key: 'verbose', type: '-' },
-        { key: 'debug', type: '-' },
       ];
       expect(Command.parse(syntax)).toEqual(expected);
     });
@@ -74,7 +64,7 @@ describe('Command', () => {
           { key: 'name', value: 'Alice' },
           { key: 'age', value: '30' },
         ],
-        options: [],
+        options: new Set(),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
@@ -92,24 +82,18 @@ describe('Command', () => {
           { key: 'name', value: 'Alice' },
           { key: 'age', value: undefined },
         ],
-        options: [],
+        options: new Set(),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
     });
 
     it('validates arguments with options provided', () => {
-      const params = [
-        { key: 'verbose', type: '-' },
-        { key: 'debug', type: '-' },
-      ];
-      const args = ['-verbose'];
+      const params = [];
+      const args = ['-verbose', '-debug'];
       const expected = {
         arguments: [],
-        options: [
-          { key: 'verbose', value: true },
-          { key: 'debug', value: false },
-        ],
+        options: new Set(['-verbose', '-debug']),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
@@ -133,21 +117,10 @@ describe('Command', () => {
       );
     });
 
-    it('throws an error for unexpected option arguments', () => {
-      const params = [{ key: 'verbose', type: '-' }];
-      const args = ['-invalid'];
-
-      expect(() => Command.validate(params, args)).toThrow(
-        new CommandError('Unexpected option: -invalid')
-      );
-    });
-
     it('validates required, optional, and options together', () => {
       const params = [
         { key: 'name', type: '!' },
         { key: 'age', type: '?' },
-        { key: 'verbose', type: '-' },
-        { key: 'debug', type: '-' },
       ];
 
       const args = ['Alice', '-verbose'];
@@ -157,10 +130,7 @@ describe('Command', () => {
           { key: 'name', value: 'Alice' },
           { key: 'age', value: undefined },
         ],
-        options: [
-          { key: 'verbose', value: true },
-          { key: 'debug', value: false },
-        ],
+        options: new Set(['-verbose']),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
@@ -170,8 +140,6 @@ describe('Command', () => {
       const params = [
         { key: 'name', type: '!' },
         { key: 'age', type: '?' },
-        { key: 'verbose', type: '-' },
-        { key: 'debug', type: '-' },
       ];
 
       const args = ['Alice', '30', '-verbose', '-debug'];
@@ -181,10 +149,7 @@ describe('Command', () => {
           { key: 'name', value: 'Alice' },
           { key: 'age', value: '30' },
         ],
-        options: [
-          { key: 'verbose', value: true },
-          { key: 'debug', value: true },
-        ],
+        options: new Set(['-verbose', '-debug']),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
@@ -194,7 +159,6 @@ describe('Command', () => {
       const params = [
         { key: 'name', type: '!' },
         { key: 'age', type: '?' },
-        { key: 'verbose', type: '-' },
       ];
 
       const args = ['Alice', '-verbose'];
@@ -204,7 +168,7 @@ describe('Command', () => {
           { key: 'name', value: 'Alice' },
           { key: 'age', value: undefined },
         ],
-        options: [{ key: 'verbose', value: true }],
+        options: new Set(['-verbose']),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
@@ -214,7 +178,6 @@ describe('Command', () => {
       const params = [
         { key: 'name', type: '!' },
         { key: 'age', type: '?' },
-        { key: 'verbose', type: '-' },
       ];
 
       const args = ['Alice'];
@@ -224,7 +187,7 @@ describe('Command', () => {
           { key: 'name', value: 'Alice' },
           { key: 'age', value: undefined },
         ],
-        options: [{ key: 'verbose', value: false }],
+        options: new Set(),
       };
 
       expect(Command.validate(params, args)).toEqual(expected);
@@ -285,21 +248,19 @@ describe('Command', () => {
       );
     });
 
-    it('throws an error if the option is not found', () => {
+    it('returns false if the option is not found', () => {
       Command.result = {
         arguments: [],
-        options: [{ key: 'debug', value: false }],
+        options: new Set(),
       };
 
-      expect(() => Command.option('verbose')).toThrow(
-        new CommandError('Undefined option name: verbose')
-      );
+      expect(Command.option('verbose')).toBe(false);
     });
 
     it('returns the value of the option when found', () => {
       Command.result = {
         arguments: [],
-        options: [{ key: 'verbose', value: true }],
+        options: new Set(['-verbose']),
       };
 
       const result = Command.option('verbose');
@@ -312,14 +273,14 @@ describe('Command', () => {
       jest.spyOn(Command, 'parse').mockReturnValue([]);
       jest.spyOn(Command, 'validate').mockReturnValue({
         arguments: [],
-        options: [{ key: 'log', value: true }],
+        options: new Set(['-log']),
       });
 
       Command.option('log'); // This should invoke `validate` and cache the result.
 
       expect(Command['result']).toEqual({
         arguments: [],
-        options: [{ key: 'log', value: true }],
+        options: new Set(['-log']),
       });
     });
   });

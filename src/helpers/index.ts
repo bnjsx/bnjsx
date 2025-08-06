@@ -1,14 +1,20 @@
-import { isError, isObj, isSymbol } from './modules/Test';
+import { isArr, isError, isObj, isStr, isSymbol } from './Test';
 
-export * from './modules/Echo';
-export * from './modules/Faker';
-export * from './modules/Logger';
-export * from './modules/Test';
-export * from './modules/Text';
-export * from './modules/UTC';
-export * from './modules/Zone';
-export * from './modules/Config';
-export * from './tools/Vite';
+export * from './Echo';
+export * from './Faker';
+export * from './Logger';
+export * from './Test';
+export * from './Text';
+export * from './UTC';
+export * from './Zone';
+export * from './Config';
+export * from './Vite';
+export * from './Folder';
+export * from './Store';
+export * from './Chrono';
+export * from './Mime';
+export * from './Lang';
+export * from './Mixer';
 
 /**
  * Checks if the given object is a valid `MegaDriver`.
@@ -157,4 +163,92 @@ export function bugger(error: Error): void {
 
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   }
+}
+
+/**
+ * Logs a formatted SQL query and its associated argument values to the console.
+ * Useful for debugging raw SQL queries and inspecting runtime values.
+ *
+ * @param query - The raw SQL query string.
+ * @param values - The array of argument values bound to the query.
+ */
+export function logSQL(query: string, values: Array<any>) {
+  if (!isStr(query)) query = '';
+  if (!isArr(values)) values = [];
+
+  console.log(
+    `\n${blue(`[SQL]`)}\n${formatQuery(query)}\n${blue('[ARGS]')}\n${orange(
+      JSON.stringify(values)
+    )}\n`
+  );
+}
+
+export function formatQuery(query: string): string {
+  return query
+    .replace(/\s+/g, ' ') // normalize spaces
+    .replace(
+      /\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|LEFT JOIN|RIGHT JOIN|INNER JOIN|AND|OR|LIMIT|OFFSET)\b/g,
+      '\n$1'
+    )
+    .replace(/\n\s+/g, '\n') // trim leading space on new lines
+    .trim()
+    .split('\n')
+    .map((line) => green(line.trim())) // trim trailing spaces here
+    .join('\n');
+}
+
+/**
+ * Replaces `:placeholders` in a template string with corresponding values from the given params.
+ *
+ * - Placeholders are prefixed with a colon (e.g., `:name`, `:count`).
+ * - If a key is missing in the params object, the placeholder is left unchanged.
+ *
+ * @param template - The string containing colon-prefixed placeholders.
+ * @param params - An object mapping keys to replacement values.
+ * @returns A formatted string with placeholders replaced by parameter values.
+ */
+export function format(
+  template: string,
+  params: Record<string, string | number>
+): string {
+  if (!isStr(template)) template = '';
+  if (!isObj(params)) params = {};
+
+  return template.replace(/:(\w+)/g, (_, key) => {
+    return params[key] !== undefined ? String(params[key]) : `:${key}`;
+  });
+}
+
+/**
+ * Logs a structured, colorful dev warning.
+ *
+ * @param message - Short message describing the warning.
+ * @param context - Optional key-value pairs for additional context.
+ * @param label - Optional block title (default: "Warning").
+ */
+export function warn(
+  message: string,
+  context?: Record<string, any>,
+  label?: string
+) {
+  if (!isStr(message)) message = 'Heads up';
+  if (!isStr(label)) label = 'Warning';
+  if (!isObj(context)) context = {};
+
+  const contextEntries = Object.entries(context);
+  const keyWidth =
+    contextEntries.reduce((max, [key]) => Math.max(max, key.length), 0) + 1;
+
+  console.log(blue(`\n╭─ ${label} ${'─'.repeat(50 - label.length)}`));
+  console.log(`│ ${red('⚠ ')} ${message}`);
+
+  if (contextEntries.length > 0) {
+    console.log(blue(`├─ Context ${'─'.repeat(50 - 9)}`));
+    for (const [key, value] of contextEntries) {
+      const paddedKey = green(`${key}:`).padEnd(keyWidth + 1);
+      console.log(`│ ${paddedKey} ${value}`);
+    }
+  }
+
+  console.log(blue(`╰${'─'.repeat(52)}\n`));
 }

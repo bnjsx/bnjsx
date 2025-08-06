@@ -4,7 +4,7 @@ import Database from 'better-sqlite3';
 import { Driver, Connection, Rows } from './Driver';
 
 // Helpers
-import { isArr, isNum, isStr } from '../../helpers';
+import { isArr, isBool, isNum, isStr } from '../../helpers';
 
 // Errors
 import {
@@ -126,7 +126,7 @@ export class SQLite implements Driver {
         const sqlite: Connection = {
           id: Symbol('Connection'),
           driver: this,
-          query(sql: string, values?: Array<string | number>) {
+          query(sql: string, values?: Array<string | number | boolean>) {
             return new Promise((resolve, reject) => {
               if (!isStr(sql)) {
                 return reject(new QueryError(`Invalid query: ${String(sql)}`));
@@ -139,6 +139,11 @@ export class SQLite implements Driver {
                   new QueryError(`Invalid query values: ${String(values)}`)
                 );
               }
+
+              values = values.map((value) => {
+                if (isBool(value)) return value ? 1 : 0;
+                return value;
+              });
 
               values.forEach((value) => {
                 if (!isNum(value) && !isStr(value)) {

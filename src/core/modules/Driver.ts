@@ -1,7 +1,7 @@
 /**
  * Generic type representing a single row.
  */
-export type Row = { [column: string]: number | string | null };
+export type Row<T = any> = { [column: string]: T };
 
 /**
  * Generic type representing multiple rows.
@@ -69,7 +69,10 @@ export interface Connection {
    *
    * @note This method resolves with `Rows` in SELECT queries, otherwise `undefined` for other query types.
    */
-  query(sql: string, values?: Array<string | number>): Promise<QueryResult>;
+  query(
+    sql: string,
+    values?: Array<string | number | boolean>
+  ): Promise<QueryResult>;
 
   /**
    * Closes the database connection.

@@ -1,3 +1,31 @@
+const mock = {
+  connection: () => {
+    return {
+      id: Symbol('PoolConnection'),
+      driver: { id: Symbol('MySQL') },
+      query: jest.fn(() => Promise.resolve()),
+      release: jest.fn(() => Promise.resolve()),
+    } as any;
+  },
+};
+
+const connection = mock.connection();
+const options = {
+  default: 'main',
+  cluster: {
+    request: jest.fn(() => Promise.resolve(connection)),
+  },
+};
+
+jest.mock('../../../src/config', () => ({
+  config: () => {
+    return {
+      loadSync: () => options,
+      resolveSync: () => __dirname,
+    };
+  },
+}));
+
 import { Builder } from '../../../src/core';
 import { Insert } from '../../../src/core';
 import { Select } from '../../../src/core';
@@ -7,15 +35,58 @@ import { Upsert } from '../../../src/core/sql/Upsert';
 
 import { QueryError } from '../../../src/errors';
 
-const mock = {
-  connection: () => {
-    return {
-      id: Symbol('PoolConnection'),
-      driver: { id: Symbol('MySQL') },
-      query: jest.fn(() => Promise.resolve()),
-    } as any;
-  },
-};
+describe('Builder.require', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should call callback with a new Builder and release connection', async () => {
+    const result = await Builder.require(async (builder) => {
+      expect(builder).toBeInstanceOf(Builder);
+      return 'OK';
+    });
+
+    expect(result).toBe('OK');
+  });
+
+  it('should release connection even if callback throws', async () => {
+    expect(connection.release).not.toHaveBeenCalled();
+
+    await expect(
+      Builder.require(() => {
+        throw new Error('Fail test');
+      })
+    ).rejects.toThrow('Fail test');
+
+    expect(connection.release).toHaveBeenCalled();
+  });
+
+  it('should use provided Builder if passed', async () => {
+    expect(connection.release).not.toHaveBeenCalled();
+
+    const builder = new Builder(connection);
+
+    const result = await Builder.require(
+      async (b) => {
+        expect(b).toBe(builder);
+        return 99;
+      },
+      undefined,
+      builder
+    );
+
+    expect(result).toBe(99);
+
+    // we don't release custom builders since these builders may be used in transactions...
+    // and must execute multiple queries...
+    expect(connection.release).not.toHaveBeenCalled();
+  });
+
+  it('should throw if callback is not a function', async () => {
+    // @ts-ignore
+    await expect(Builder.require(null)).rejects.toThrow(QueryError);
+  });
+});
 
 describe('Builder', () => {
   let connection: jest.Mocked<any>;

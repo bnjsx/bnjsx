@@ -1,4 +1,4 @@
-import { isPoolCon } from '../../helpers';
+import { isFunc, isPoolCon, isStr } from '../../helpers';
 import { QueryError } from '../../errors';
 
 import { Insert } from '../sql/Insert';
@@ -9,6 +9,7 @@ import { Delete } from '../sql/Delete';
 import { PoolConnection } from './Pool';
 import { QueryResult, Row, Rows } from './Driver';
 import { Upsert } from '../sql/Upsert';
+import { config } from '../../config';
 
 /**
  * A Simple Yet Powerful Query Builder
@@ -86,7 +87,7 @@ export class Builder {
    */
   public raw<R = QueryResult>(
     query: string,
-    values?: Array<string | number>
+    values?: Array<string | number | boolean>
   ): Promise<R> {
     return this.connection.query(query, values) as Promise<R>;
   }
@@ -149,5 +150,53 @@ export class Builder {
    */
   public delete(): Delete {
     return new Delete(this.connection);
+  }
+
+  /**
+   * Handles acquiring and releasing database connections for you.
+   *
+   * You just provide a callback that receives a fresh Builder instance,
+   * and this method takes care of connection lifecycle — creating, managing, and releasing it when done.
+   *
+   * Internally, if you provide a Builder, it will reuse it without releasing the connection (for advanced use).
+   * But normally, you just use this to avoid ever forgetting to release connections.
+   *
+   * @template T
+   * @param callback - Function that gets a Builder instance to run queries.
+   * @param pool - Optional pool name to get connections from.
+   * @param builder - Internal: optional existing Builder (connection not released automatically).
+   * @returns Result from the callback.
+   */
+  public static async require<T>(
+    callback: (builder: Builder) => Promise<T> | T,
+    pool?: string,
+    builder?: Builder
+  ): Promise<T> {
+    if (!isFunc(callback)) {
+      throw new QueryError('Invalid callback function');
+    }
+
+    let release = true;
+    let connection: PoolConnection;
+
+    if (builder instanceof Builder) {
+      connection = builder.get.connection();
+      release = false;
+    } else {
+      const app = config().loadSync();
+      if (!isStr(pool)) pool = app.default;
+
+      connection = await app.cluster.request(pool);
+      builder = new Builder(connection);
+    }
+
+    try {
+      const result = await callback(builder);
+      release && connection.release();
+      return result;
+    } catch (error) {
+      release && connection.release();
+      throw error;
+    }
   }
 }
