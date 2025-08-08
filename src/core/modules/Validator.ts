@@ -179,6 +179,19 @@ export class ValidatorGetter {
 }
 
 /**
+ * Type definition for the `get` method used in Validator.
+ *
+ * - `() => ValidatorGetter` returns a helper for accessing validated data and errors
+ * - `<T>(key: string)` returns the raw value or null
+ * - `<T>(key: string, def: T)` returns the raw value or fallback
+ */
+export type ValidatorGet = {
+  (): ValidatorGetter;
+  <T = unknown>(key: string): T;
+  <T = unknown>(key: string, def: T): T;
+};
+
+/**
  * A unified class for parsing, validating, and casting HTTP request body data.
  */
 export class Validator {
@@ -369,29 +382,16 @@ export class Validator {
   };
 
   /**
-   * Returns a `ValidatorGetter` instance for accessing validated fields, files, and errors.
-   *
-   * @returns A `ValidatorGetter` instance.
-   */
-  public get(): ValidatorGetter;
-
-  /**
-   * Returns the raw value associated with the given key from the parsed input.
-   *
-   * @param key - The key to retrieve.
-   * @returns The raw value associated with the key, or `null` if not present.
-   */
-  public get<T = unknown>(key: string): T;
-
-  /**
    * Returns the raw value for the given key if it exists, otherwise returns the provided default value.
    *
    * @param key - The key to retrieve.
    * @param def - A fallback value to return if the key is not found.
    * @returns The raw value associated with the key, or the default value.
    */
-  public get<T = unknown>(key: string, def: T): T;
-  public get<T = unknown>(key?: string, def = null): T | ValidatorGetter {
+  public get: ValidatorGet = <T = unknown>(
+    key?: string,
+    def: T = null
+  ): T | ValidatorGetter => {
     if (key === undefined) {
       return new ValidatorGetter({
         data: this.data,
@@ -402,7 +402,7 @@ export class Validator {
     }
 
     return this.data[key] === undefined ? def : (this.data[key] as T);
-  }
+  };
 
   /**
    * Checks if a key exists in the parsed data.

@@ -266,11 +266,31 @@ describe('Service', () => {
     await Folder.delete('test-folder');
   });
 
-  test('Returns Store instance using store()', () => {
-    const store = service.store('test-store', { ttl: 500 });
-    expect(store).toBeInstanceOf(Store);
-    expect(store.key).toBe('test-store');
-    Store.delete('test-store');
+  describe('Service.store', () => {
+    test('Should create and return a store', () => {
+      const store = service.store('custom');
+      expect(store).toBeInstanceOf(Store);
+      expect(Store['stores'].has('custom')).toBeTruthy();
+      expect(Store['stores'].get('custom')).toBe(store);
+      expect(Store.get('custom')).toBe(store);
+      expect(service.store('custom')).toBe(store);
+
+      // store some values
+      store.set('key_1', 'value_1');
+      store.set('key_2', 'value_2');
+      store.set('key_3', 'value_3');
+    });
+
+    test('Should reference the same store instance', () => {
+      const store = service.store('custom');
+
+      expect(store.get('key_1')).toBe('value_1');
+      expect(store.get('key_2')).toBe('value_2');
+      expect(store.get('key_3')).toBe('value_3');
+
+      // done
+      Store.delete('custom');
+    });
   });
 
   describe('Service.public', () => {

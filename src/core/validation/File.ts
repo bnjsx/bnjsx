@@ -10,7 +10,7 @@ export class File {
     options: {
       count: null,
       size: { min: null, max: null },
-      type: [],
+      type: null,
       required: null,
       location: null,
       messages: {

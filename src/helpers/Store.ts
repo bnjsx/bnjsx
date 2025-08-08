@@ -71,9 +71,6 @@ export class Store {
   /** Maximum total memory space (in bytes) for all items. */
   private space: number;
 
-  /** Default time-to-live (in seconds) for each item. */
-  private ttl: number | null;
-
   /** Interval (in seconds) at which expired items are cleaned up. */
   private timeout: number;
 
@@ -117,9 +114,9 @@ export class Store {
    * @returns The existing or newly created store instance.
    */
   public static get(key?: string, ops?: StoreOptions): Store {
-    if (isStr(key) && this.stores.has(key)) return this.stores.get(key);
+    if (isStr(key) && Store.stores.has(key)) return Store.stores.get(key);
     const instance = new Store(key, ops);
-    this.stores.set(key, instance);
+    Store.stores.set(key, instance);
     return instance;
   }
 
@@ -129,13 +126,13 @@ export class Store {
    * @param key - The name of the store to delete.
    */
   public static delete(key: string): void {
-    const store = this.stores.get(key);
+    const store = Store.stores.get(key);
     if (!store) return;
 
     store.memory = 0;
     store.stopCleaning();
     store.store.clear();
-    this.stores.delete(key);
+    Store.stores.delete(key);
   }
 
   // ─── Instance API ───────────────────────────────────────────

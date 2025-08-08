@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@2.0.1 - 2025-08-08**
+
+### Fixed
+
+- Fixed `Validator.get()` causing errors due to undefined `this`.
+- Fixed default value issues in `Validator.file()`.
+- Fixed URL validation in `Validator.field().url()` and `isURL()` allowing previously valid URLs.
+
+## **Bnjsx@2.0.0 - 2025-08-06**
+
+### Added
+
+- **Service module**  
+  A self-contained unit combining routing, DB operations, caching, file upload, body parsing, flash messages, redirections, validation, and more.  
+  Replaces the traditional MVC pattern (Router, Model, Controller) by consolidating related code in one place, reducing the number of files especially in large projects.
+
+- **New modules:**
+
+  - _Service_: Handles HTTP requests with routing, caching, validation, etc.
+  - _Store_: Memory-based cache with periodic cleanup.
+  - _Folder_: File-system cache linked to a directory, supports adding/removing/clearing cache files.
+  - _Mixer_: Helper to create data combinations, useful for unique row insertions.
+  - _Validator_: Powerful form/body validator with a clean API and many predefined methods.
+  - _Table / Fetcher_: Simplified CRUD and data fetching built on the Builder module.
+  - _Chrono_: Converts dates to human-readable formats (e.g., "1 year ago") with multi-language support (en, fr by default).
+  - _Lang_: Language loader for easy multi-language support anywhere in your app.
+
+- **New middlewares:**
+  - Maintenance middleware + commands (`up`, `down`) to toggle maintenance mode.
+  - Error middleware for global error handling.
+  - Log middleware for error logging in project root.
+
 ## **Bnjsx@1.1.2 - 2025-06-22**
 
 ### Fixed

@@ -576,103 +576,58 @@ export class Form {
    * @param options - The validation options for the file upload.
    *
    * @throws `FormError` if `name` is not a string.
-   * @throws `FormError` if `options` is not an object.
-   * @throws `FormError` if `options.type` is not an array of strings.
-   * @throws `FormError` if `options.count` is not a positive integer.
-   * @throws `FormError` if `options.size` is not an object with valid `min` and `max` values.
-   * @throws `FormError` if `options.required` is not a boolean.
-   * @throws `FormError` if `options.location` is not an absolute string path.
-   * @throws `FormError` if `options.messages` is not a valid object.
    */
-  public file(name: string, options: FileOptions = {}): void {
+  public file(name: string, options: FileOptions): void {
     if (!isStr(name)) throw new FormError('Invalid file name');
-    if (!isObj(options)) throw new FormError('Invalid file options');
+    if (!isObj(options)) options = {};
+    if (!isObj(options.size)) options.size = {};
+    if (!isArrOfStr(options.type)) options.type = [];
 
-    if (options.type) {
-      if (!isArrOfStr(options.type)) {
-        throw new FormError('Invalid file type');
-      }
-    } else options.type = [];
+    options.required = !!options.required;
 
-    if (options.count) {
-      if (!isInt(options.count) || options.count <= 0) {
-        throw new FormError('Invalid file count');
-      }
-    } else options.count = Number.MAX_SAFE_INTEGER;
+    if (!isInt(options.size.max)) options.size.max = Number.MAX_SAFE_INTEGER;
+    if (!isInt(options.size.min)) options.size.min = 0;
+    if (options.size.min > options.size.max) {
+      options.size = { min: 0, max: Number.MAX_SAFE_INTEGER };
+    }
 
-    if (options.size) {
-      if (!isObj(options.size)) throw new FormError('Invalid file size');
+    if (!isInt(options.count) || options.count <= 0) {
+      options.count = Number.MAX_SAFE_INTEGER;
+    }
 
-      const { min, max } = options.size;
+    if (!isStr(options.location)) {
+      options.location = resolver(config().resolveSync(), './uploads');
+    }
 
-      if (!isInt(min)) {
-        throw new FormError('Invalid minimum file size');
-      }
-      if (!isInt(max)) {
-        throw new FormError('Invalid maximum file size');
-      }
-      if (min > max) {
-        throw new FormError('File size min cannot be greater than max');
-      }
-    } else options.size = { min: 0, max: Number.MAX_SAFE_INTEGER };
+    if (!isAbsolute(options.location)) {
+      options.location = resolver(config().resolveSync(), options.location);
+    }
 
-    if (options.required) {
-      if (!isBool(options.required)) {
-        throw new FormError('Invalid required flag');
-      }
-    } else options.required = false;
-
-    if (options.location) {
-      if (!isStr(options.location)) {
-        throw new FormError('Invalid file location');
-      }
-      if (!isAbsolute(options.location)) {
-        throw new FormError('File location path must be absolute');
-      }
-    } else options.location = resolver(config().resolveSync(), './uploads');
-
-    if (options.messages) {
-      if (!isObj(options.messages)) {
-        throw new FormError('Invalid messages object');
-      }
-
-      if (options.messages.count) {
-        if (!isStr(options.messages.count)) {
-          throw new FormError('Invalid count message');
-        }
-      } else {
+    if (isObj(options.messages)) {
+      if (!isStr(options.messages.count)) {
         options.messages.count = `Too many files. Maximum allowed is ${options.count}.`;
       }
 
-      if (options.messages.required) {
-        if (!isStr(options.messages.required)) {
-          throw new FormError('Invalid required message');
-        }
-      } else options.messages.required = `This field is required.`;
+      if (!isStr(options.messages.required)) {
+        options.messages.required = `This field is required.`;
+      }
 
-      if (options.messages.type) {
-        if (!isStr(options.messages.type)) {
-          throw new FormError('Invalid type message');
-        }
-      } else options.messages.type = `File must be ${options.type.join(', ')}.`;
+      if (!isStr(options.messages.type)) {
+        options.messages.type = `File must be ${options.type.join(', ')}.`;
+      }
 
-      if (options.messages.size) {
-        if (!isObj(options.messages.size)) {
-          throw new FormError('Invalid size message object');
-        }
+      if (!isObj(options.messages.size)) options.messages.size = {};
 
-        if (options.messages.size.min && !isStr(options.messages.size.min)) {
-          throw new FormError('Invalid min size message');
-        }
+      if (!isStr(options.messages.size.min)) {
+        options.messages.size.min = `File must be at least ${toSize(
+          options.size.min
+        )}.`;
+      }
 
-        if (options.messages.size.max && !isStr(options.messages.size.max)) {
-          throw new FormError('Invalid max size message');
-        }
-      } else {
-        options.messages.size = {
-          min: `File must be at least ${toSize(options.size.min)}.`,
-          max: `File must not exceed ${toSize(options.size.max)}.`,
-        };
+      if (!isStr(options.messages.size.max)) {
+        options.messages.size.max = `File must not exceed ${toSize(
+          options.size.max
+        )}.`;
       }
     } else {
       options.messages = {

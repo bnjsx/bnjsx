@@ -12,6 +12,7 @@ import {
   isStr,
   format,
   isRegex,
+  isURL,
 } from '../../helpers';
 
 import { Tester, TestFn } from '../modules/Form';
@@ -684,8 +685,8 @@ export class Field {
    * @returns The Field instance for chaining.
    */
   public url(message?: string): this {
-    return this.is(
-      /^https?:\/\/[\w\-]+(\.[\w\-]+)+[\/#?]?.*$/i,
+    return this.test(
+      (url: string) => isURL(url, ['http', 'https'], true),
       message ?? format(this.messages.url, { field: this.state.name })
     );
   }

@@ -86,7 +86,7 @@ import {
   isBuffer,
   isHTTPMethod,
   isId,
-  isUrl,
+  isURL,
 } from '../../src/helpers';
 
 test('isFullObj should correctly check if object is fully populated', () => {
@@ -718,55 +718,55 @@ describe('isBuffer', () => {
   });
 });
 
-describe('isUrl', () => {
+describe('isURL', () => {
   test('returns false for non-strings', () => {
-    expect(isUrl(null as any)).toBe(false);
-    expect(isUrl(undefined as any)).toBe(false);
-    expect(isUrl(123 as any)).toBe(false);
-    expect(isUrl({} as any)).toBe(false);
+    expect(isURL(null as any)).toBe(false);
+    expect(isURL(undefined as any)).toBe(false);
+    expect(isURL(123 as any)).toBe(false);
+    expect(isURL({} as any)).toBe(false);
   });
 
   test('validates https URL by default', () => {
-    expect(isUrl('https://example.com')).toBe(true);
-    expect(isUrl('https://example.com/')).toBe(true);
+    expect(isURL('https://example.com')).toBe(true);
+    expect(isURL('https://example.com/')).toBe(true);
   });
 
   test('normalizes and trims in non-strict mode (default)', () => {
-    expect(isUrl('   HTTPS://example.com  ')).toBe(true);
+    expect(isURL('   HTTPS://example.com  ')).toBe(true);
   });
 
   test('fails with protocol not in the allowed list', () => {
-    expect(isUrl('ftp://example.com')).toBe(false);
-    expect(isUrl('http://example.com', ['https'])).toBe(false);
+    expect(isURL('ftp://example.com')).toBe(false);
+    expect(isURL('http://example.com', ['https'])).toBe(false);
   });
 
   test('passes with allowed protocols', () => {
-    expect(isUrl('http://example.com', ['http', 'https'])).toBe(true);
-    expect(isUrl('ftp://example.com', ['ftp'])).toBe(true);
+    expect(isURL('http://example.com', ['http', 'https'])).toBe(true);
+    expect(isURL('ftp://example.com', ['ftp'])).toBe(true);
   });
 
   test('passes strict mode only when url matches parsed.href exactly (with trailing slash)', () => {
     const url = 'https://example.com/';
-    expect(isUrl(url, ['https'], true)).toBe(true);
-    expect(isUrl('https://EXAMPLE.com/', ['https'], true)).toBe(false); // case-sensitive
-    expect(isUrl(' https://example.com/ ', ['https'], true)).toBe(false); // space-sensitive
+    expect(isURL(url, ['https'], true)).toBe(true);
+    expect(isURL('https://EXAMPLE.com/', ['https'], true)).toBe(false); // case-sensitive
+    expect(isURL(' https://example.com/ ', ['https'], true)).toBe(false); // space-sensitive
   });
 
   test('rejects invalid URLs with invalid characters', () => {
     const url =
       "https://localhost/foo\xa41```''a'a;slslslsoowiwuu26y252557322o,ss";
-    expect(isUrl(url)).toBe(false);
+    expect(isURL(url)).toBe(false);
   });
 
   test('accepts localhost with valid protocol', () => {
-    expect(isUrl('https://localhost')).toBe(true);
-    expect(isUrl('http://localhost', ['http'])).toBe(true);
+    expect(isURL('https://localhost')).toBe(true);
+    expect(isURL('http://localhost', ['http'])).toBe(true);
   });
 
   test('returns false if new URL throws (e.g., badly formed input)', () => {
-    expect(isUrl('not a url')).toBe(false);
-    expect(isUrl('https://')).toBe(false);
-    expect(isUrl('')).toBe(false);
+    expect(isURL('not a url')).toBe(false);
+    expect(isURL('https://')).toBe(false);
+    expect(isURL('')).toBe(false);
   });
 });
 

@@ -92,7 +92,8 @@ export class Router {
       return;
     }
 
-    this.routes.push({ method, pattern, params, middlewares });
+    const decoded = params.map((p) => decodeURIComponent(p));
+    this.routes.push({ method, pattern, params: decoded, middlewares });
 
     return this;
   }
