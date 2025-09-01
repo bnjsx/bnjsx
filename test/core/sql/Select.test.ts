@@ -822,6 +822,18 @@ describe('Select', () => {
       );
     });
 
+    it('should handle invalid query results', async () => {
+      const mockResponse = []; // invalid
+      jest.spyOn(connection, 'query').mockResolvedValue(mockResponse);
+
+      const count = await select
+        .col('id')
+        .from('users')
+        .count({ column: 'id' });
+
+      expect(count).toBe(0); // 0 is the default count
+    });
+
     it('should reject on query failure', async () => {
       const mockError = new Error('Ops');
       jest.spyOn(connection, 'query').mockRejectedValue(mockError);

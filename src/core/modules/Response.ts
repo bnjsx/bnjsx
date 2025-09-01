@@ -307,9 +307,7 @@ export class Redirector {
    * @throws ResponseError if the URL is invalid.
    */
   public to(url: string): this {
-    if (!isStr(url)) {
-      throw new ResponseError('Invalid redirect url');
-    }
+    if (!isStr(url)) throw new ResponseError('Invalid redirect url');
 
     this.url = url;
     return this;
@@ -327,6 +325,8 @@ export class Redirector {
     message: string,
     type: 'error' | 'info' | 'success' = 'error'
   ): this {
+    if (!isStr(message)) throw new ResponseError('Invalid message');
+    if (!isStr(type)) throw new ResponseError('Invalid type');
     if (!this.req[FLASH_SET_KEY]) this.req[FLASH_SET_KEY] = [];
 
     this.req[FLASH_SET_KEY].push({ type, message });

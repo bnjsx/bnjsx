@@ -41,21 +41,25 @@ jest.mock('../../../src/config', () => ({
   },
 }));
 
-const Redirector = { to: jest.fn().mockReturnThis() };
+const Redirector = {
+  to: jest.fn().mockReturnThis(),
+  with: jest.fn().mockReturnThis(),
+  send: jest.fn().mockResolvedValue(undefined),
+};
+
 const res = {
   redirect: jest.fn(() => Redirector),
   setHeader: jest.fn(),
   cookie: jest.fn(),
+  render: jest.fn(),
+  json: jest.fn(),
 };
 
 const req = {
   query: new Map([['page', '2']]),
 };
 
-import {
-  FLASH_GET_KEY,
-  FLASH_SET_KEY,
-} from '../../../src/core/middlewares/flash';
+import { FLASH_SET_KEY } from '../../../src/core/middlewares/flash';
 import { Builder } from '../../../src/core/modules/Builder';
 import { Fetcher } from '../../../src/core/modules/Fetcher';
 
@@ -245,34 +249,51 @@ describe('Service', () => {
     });
   });
 
-  test('redirect calls response.redirect', () => {
-    expect(service.redirect()).toBe(Redirector);
-    expect(service.redirect('/path').to).toHaveBeenCalledWith('/path');
+  describe('redirect()', () => {
+    test('should returns a Redirector instance', () => {
+      expect(service.redirect()).toBe(Redirector);
+      expect(service.redirect('/path')).toBe(Redirector);
+    });
   });
 
-  test('table returns a Table instance from Table.request()', () => {
-    const result = service.table('users', 'main');
-    expect(result).toBeInstanceOf(Table);
+  describe('goto()', () => {
+    test('should redirect to the specified path', () => {
+      expect(service.goto('/path')).resolves.toBe(undefined);
+    });
+
+    test('should redirect with a message', () => {
+      expect(service.goto('/path', 'message')).resolves.toBe(undefined);
+    });
   });
 
-  test('parse calls Form().parse(req, res)', async () => {
-    expect(service.parse()).resolves.toBeUndefined();
+  describe('table()', () => {
+    test('should returns a Table instance', () => {
+      const result = service.table('users', 'main');
+      expect(result).toBeInstanceOf(Table);
+    });
   });
 
-  test('Returns Folder instance using folder()', async () => {
-    const folder = service.folder('test-folder', { ttl: 1000 });
-    expect(folder).toBeInstanceOf(Folder);
-    expect(folder.name).toBe('test-folder');
-    await Folder.delete('test-folder');
+  describe('parse()', () => {
+    test('should parses the form body', async () => {
+      expect(service.parse()).resolves.toBeUndefined();
+    });
   });
 
-  describe('Service.store', () => {
+  describe('folder()', () => {
+    test('should return a Folder instance', async () => {
+      const folder = service.folder('test-folder');
+      expect(folder).toBeInstanceOf(Folder);
+      expect(folder.name).toBe('test-folder');
+      await folder.clear();
+    });
+  });
+
+  describe('store()', () => {
     test('Should create and return a store', () => {
       const store = service.store('custom');
       expect(store).toBeInstanceOf(Store);
       expect(Store['stores'].has('custom')).toBeTruthy();
       expect(Store['stores'].get('custom')).toBe(store);
-      expect(Store.get('custom')).toBe(store);
       expect(service.store('custom')).toBe(store);
 
       // store some values
@@ -289,11 +310,11 @@ describe('Service', () => {
       expect(store.get('key_3')).toBe('value_3');
 
       // done
-      Store.delete('custom');
+      store.clear();
     });
   });
 
-  describe('Service.public', () => {
+  describe('public()', () => {
     beforeEach(() => {
       service.root = '/project/root';
       service.config = { public: { root: 'public' } };
@@ -337,7 +358,7 @@ describe('Service', () => {
     });
   });
 
-  describe('validator() and setValidator()', () => {
+  describe('validator()', () => {
     test('Returns a fresh Validator instance', () => {
       const instance = service.validator();
       expect(instance).toBeInstanceOf(Validator);
@@ -436,7 +457,7 @@ describe('Service', () => {
     });
   });
 
-  describe('host method', () => {
+  describe('host()', () => {
     test('extracts domain from https URL with www', () => {
       expect(service.host('https://www.example.com')).toBe('example');
     });
@@ -483,32 +504,21 @@ describe('Service', () => {
     });
   });
 
-  describe('render method', () => {
-    test('render initializes locals if undefined', async () => {
-      delete req[FLASH_GET_KEY];
-      const html = await service.render('user.view');
-      expect(html).toContain('<html>');
-      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html');
-    });
-
-    test('render adds empty flash array if no flash on request', async () => {
-      req[FLASH_GET_KEY] = undefined;
-      const html = await service.render('user.view', { foo: 'bar' });
-      expect(html).toContain('<html>');
-      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html');
-    });
-
-    test('render includes flash in locals if present', async () => {
-      req[FLASH_GET_KEY] = [{ type: 'info', message: 'hello' }];
-      const html = await service.render('user.view', {
-        flash: [{ message: 'str', type: 'error' }],
-      });
-      expect(html).toContain('<html>');
-      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html');
+  describe('render()', () => {
+    test('render should call res.render', async () => {
+      await service.render('user.view');
+      expect(res.render).toHaveBeenCalled();
     });
   });
 
-  describe('flash method', () => {
+  describe('json()', () => {
+    test('json should call res.json', async () => {
+      await service.json({});
+      expect(res.json).toHaveBeenCalled();
+    });
+  });
+
+  describe('flash()', () => {
     test('flash initializes and sets error message by default', () => {
       req[FLASH_SET_KEY] = [];
 
@@ -585,7 +595,7 @@ describe('Service', () => {
     });
   });
 
-  describe('pagination method', () => {
+  describe('pages()', () => {
     beforeEach(() => {
       // mock current request.href and request.base for default URL building
       service.request = {

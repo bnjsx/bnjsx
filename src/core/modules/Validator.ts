@@ -2,7 +2,7 @@ import { BadRequestError, ValidatorError } from '../../errors';
 import { Form, UploadedFile } from './Form';
 import { Request } from './Request';
 import { Response } from './Response';
-import { isArr, isArrOfStr, isBool, isObj, isStr } from '../../helpers';
+import { isArr, isArrOfStr, isBool, isInt, isObj, isStr } from '../../helpers';
 import { Field } from '../validation/Field';
 import { File } from '../validation/File';
 import { ValidationMessages } from '../validation/Messages';
@@ -99,17 +99,20 @@ export class ValidatorGetter {
   /**
    * Flattens all error messages into a single array.
    */
-  public errorList(): string[] {
-    return Object.values(this.state.errors).flat();
+  public errorList(length?: number): string[] {
+    const errors = Object.values(this.state.errors).flat();
+    if (!isInt(length) || length <= 0) length = errors.length;
+    return errors.slice(0, length);
   }
 
   /**
    * Flattens all error messages into a single array.
    */
-  public flashList(): Flash[] {
-    return Object.values(this.state.errors)
-      .flat()
-      .map((e) => ({ type: 'error', message: e }));
+  public flashList(length?: number): Flash[] {
+    return this.errorList(length).map((message) => ({
+      type: 'error',
+      message,
+    }));
   }
 
   /**
@@ -187,8 +190,8 @@ export class ValidatorGetter {
  */
 export type ValidatorGet = {
   (): ValidatorGetter;
-  <T = unknown>(key: string): T;
-  <T = unknown>(key: string, def: T): T;
+  <T = any>(key: string): T;
+  <T = any>(key: string, def: T): T;
 };
 
 /**
@@ -266,16 +269,17 @@ export class Validator {
   /**
    * Registers a file input for validation.
    * @param name Field name.
+   * @param display Name to display in error messages (optional).
    * @returns File instance.
    */
-  public file = (name: string): File => {
+  public file = (name: string, display?: string): File => {
     if (!isStr(name)) {
       throw new ValidatorError(
         `File name must be a string, got ${typeof name}`
       );
     }
 
-    const file = new File(name, this.messages);
+    const file = new File(name, this.messages, display);
     this.files.push(file);
     return file;
   };
@@ -284,16 +288,17 @@ export class Validator {
    * Registers a form field for validation.
    *
    * @param name Field name.
+   * @param display Name to display in error messages (optional).
    * @returns Field instance.
    */
-  public field = (name: string): Field => {
+  public field = (name: string, display?: string): Field => {
     if (!isStr(name)) {
       throw new ValidatorError(
         `Field name must be a string, got ${typeof name}`
       );
     }
 
-    const field = new Field(name, this.messages);
+    const field = new Field(name, this.messages, display);
     this.fields.push(field);
     return field;
   };
@@ -388,7 +393,7 @@ export class Validator {
    * @param def - A fallback value to return if the key is not found.
    * @returns The raw value associated with the key, or the default value.
    */
-  public get: ValidatorGet = <T = unknown>(
+  public get: ValidatorGet = <T = any>(
     key?: string,
     def: T = null
   ): T | ValidatorGetter => {
@@ -417,6 +422,19 @@ export class Validator {
     }
 
     return Object.prototype.hasOwnProperty.call(this.data, key);
+  };
+
+  /**
+   * Checks if there is at least one available field in the parsed data.
+   *
+   * Unlike {@link has}, which checks for the existence of a specific key,
+   * this method ensures that the request body is not completely empty.
+   * Useful when all fields are optional but at least one must be provided.
+   *
+   * @returns True if at least one field is present, false if body is empty.
+   */
+  public any = (): boolean => {
+    return Object.keys(this.get().defined()).length > 0;
   };
 
   /**

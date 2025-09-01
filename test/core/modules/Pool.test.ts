@@ -208,6 +208,42 @@ describe('Pool', () => {
       await expect(pool2.request()).rejects.toBeInstanceOf(MaxConnectionError);
     });
 
+    describe('shouldCheck', () => {
+      test('should not check', async () => {
+        const driver = mock.driver();
+        const connection = mock.connection();
+        driver.create = jest.fn().mockResolvedValue(connection);
+        const pool = mock.pool(driver, { shouldCheck: false });
+        expect(pool.get.options().shouldCheck).toEqual(false);
+
+        // make an idle connection
+        (await pool.request()).release();
+
+        // request again (triggers cheking)
+        await pool.request();
+
+        // checking is disabled
+        expect(connection.query).not.toHaveBeenCalled();
+      });
+
+      test('should check', async () => {
+        const driver = mock.driver();
+        const connection = mock.connection();
+        driver.create = jest.fn().mockResolvedValue(connection);
+        const pool = mock.pool(driver, { shouldCheck: true });
+        expect(pool.get.options().shouldCheck).toEqual(true);
+
+        // make an idle connection
+        (await pool.request()).release();
+
+        // request again (triggers cheking)
+        await pool.request();
+
+        // checking is enabled
+        expect(connection.query).toHaveBeenCalled();
+      });
+    });
+
     test('maxQueueSize', async () => {
       // the max number of requests allowed to be queued
       // the default value is Infinity
@@ -429,6 +465,7 @@ describe('Pool', () => {
         maxQueueSize: Infinity, // max number of requests to queue
         maxQueueTime: 1000, // max number of miliseconds a request can stay in the queue
         shouldRetry: true, // should retry connection creation and closing connections when they fail
+        shouldCheck: true, // new options to manage connection checks
         maxRetry: 3, // max number of times to retry the opertation
         retryDelay: 500, // number of miliseconds to wait before each retry attempt (3th after 1500)
         extraDelay: 0, // number of miliseoncds to add after each delay
@@ -982,6 +1019,7 @@ describe('Pool', () => {
           maxQueueSize: Infinity, // max number of requests to queue
           maxQueueTime: 1000, // max number of miliseconds a request can stay in the queue
           shouldRetry: true, // should retry connection creation and closing connections when they fail
+          shouldCheck: true, // new options to manage connection checks
           maxRetry: 3, // max number of times to retry the opertation
           retryDelay: 500, // number of miliseconds to wait before each retry attempt (3th after 1500)
           extraDelay: 500, // number of miliseoncds to add after each delay

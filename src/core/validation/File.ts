@@ -7,6 +7,7 @@ export class File {
 
   private state = {
     name: null,
+    display: null,
     options: {
       count: null,
       size: { min: null, max: null },
@@ -28,7 +29,7 @@ export class File {
    * @param name The name of the file input field.
    * @param messages An object containing validation messages templates.
    */
-  constructor(name: string, messages: ValidationMessages) {
+  constructor(name: string, messages: ValidationMessages, display?: string) {
     if (!isStr(name)) {
       throw new ValidatorError(`Invalid file name: ${String(name)}`);
     }
@@ -38,7 +39,16 @@ export class File {
     }
 
     this.state.name = name;
+    this.state.display = display;
     this.messages = messages;
+  }
+
+  /**
+   * Get the file name to display in error messages.
+   */
+  private getName(): string {
+    if (isStr(this.state.display)) return this.state.display;
+    return this.state.name;
   }
 
   /**
@@ -52,7 +62,7 @@ export class File {
     this.state.options.count = count;
     this.state.options.messages.count =
       message ??
-      format(this.messages.file.count, { field: this.state.name, count });
+      format(this.messages.file.count, { field: this.getName(), count });
     return this;
   }
 
@@ -95,14 +105,14 @@ export class File {
     this.state.options.messages.size.min =
       messages?.min ??
       format(this.messages.file.minSize, {
-        field: this.state.name,
+        field: this.getName(),
         min: toSize(min),
       });
 
     this.state.options.messages.size.max =
       messages?.max ??
       format(this.messages.file.maxSize, {
-        field: this.state.name,
+        field: this.getName(),
         max: toSize(max),
       });
 
@@ -123,7 +133,7 @@ export class File {
     this.state.options.messages.type =
       message ??
       format(this.messages.file.type, {
-        field: this.state.name,
+        field: this.getName(),
         types: isArr(types) ? types.join(', ') : types,
       });
 
@@ -140,7 +150,7 @@ export class File {
   required(message?: string): this {
     this.state.options.required = true;
     this.state.options.messages.required =
-      message ?? format(this.messages.required, { field: this.state.name });
+      message ?? format(this.messages.required, { field: this.getName() });
     return this;
   }
 

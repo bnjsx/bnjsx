@@ -294,10 +294,7 @@ export function toRegex(text: string, flags?: string): RegExp {
  * @throws `TextError` if the input is not a valid string.
  */
 export function toUpper(text: string): string {
-  if (!isStr(text)) {
-    throw new TextError(`Invalid text: ${String(text)}`);
-  }
-
+  if (!isStr(text)) return '';
   return text.toUpperCase();
 }
 
@@ -309,10 +306,7 @@ export function toUpper(text: string): string {
  * @throws `TextError` if the input is not a valid string.
  */
 export function toLower(text: string): string {
-  if (!isStr(text)) {
-    throw new TextError(`Invalid text: ${String(text)}`);
-  }
-
+  if (!isStr(text)) return '';
   return text.toLowerCase();
 }
 
@@ -326,16 +320,11 @@ export function toLower(text: string): string {
  * @throws `TextError` if the index is out of bounds.
  */
 export function toUpperAt(text: string, index: number): string {
-  if (!isStr(text)) {
-    throw new TextError(`Invalid text: ${String(text)}`);
-  }
+  if (!isStr(text)) return '';
+  if (!isInt(index)) index = 0;
 
-  if (!isInt(index)) {
-    throw new TextError(`Invalid index: ${String(index)}`);
-  }
-
-  // Ensure 'index' is within bounds
-  if (index < 0 || index >= text.length) return text; // Return the string as it is if the index is out of bounds
+  // Return the string as it is if the index is out of bounds
+  if (index < 0 || index >= text.length) return text;
 
   return text
     .split('')
@@ -353,16 +342,11 @@ export function toUpperAt(text: string, index: number): string {
  * @throws `TextError` if the index is out of bounds.
  */
 export function toLowerAt(text: string, index: number): string {
-  if (!isStr(text)) {
-    throw new TextError(`Invalid text: ${String(text)}`);
-  }
+  if (!isStr(text)) return '';
+  if (!isInt(index)) index = 0;
 
-  if (!isInt(index)) {
-    throw new TextError(`Invalid index: ${String(index)}`);
-  }
-
-  // Ensure 'index' is within bounds
-  if (index < 0 || index >= text.length) return text; // Return the string as it is if the index is out of bounds
+  // Return the string as it is if the index is out of bounds
+  if (index < 0 || index >= text.length) return text;
 
   return text
     .split('')
@@ -564,9 +548,7 @@ export function toKababCase(text: string): string {
  * @throws `TextError` if the input is not a valid string.
  */
 export function toTitle(text: string): string {
-  if (!isStr(text)) {
-    throw new TextError(`Invalid text: ${String(text)}`);
-  }
+  if (!isStr(text)) return '';
 
   return toWords(text)
     .map((word) => toUpperFirst(word))
@@ -582,14 +564,8 @@ export function toTitle(text: string): string {
  * @throws `TextError` if the input is not a valid string or if the length is not a positive integer.
  */
 export function toSnap(text: string, length: number): string {
-  if (!isStr(text)) {
-    throw new TextError(`Invalid text: ${String(text)}`);
-  }
-
-  if (!isInt(length) || length <= 0) {
-    throw new TextError(`Invalid length: ${String(length)}.`);
-  }
-
+  if (!isStr(text)) return '';
+  if (!isInt(length) || length <= 0) return text;
   return text.length <= length ? text : text.slice(0, length).trim() + '...';
 }
 
@@ -636,6 +612,8 @@ export function toWords(text: string): string[] {
  *          up to two decimal places for larger units.
  */
 export function toSize(bytes: number): string {
+  if (!isNum(bytes)) return '1 byte';
+
   const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
   let index = 0;
@@ -729,9 +707,7 @@ export function toShort(number: any): string {
  * toSlug("Hello, World!") // returns "hello-world"
  */
 export function toSlug(text: string): string {
-  if (!isStr(text)) {
-    throw new Error(`Invalid text: ${String(text)}`);
-  }
+  if (!isStr(text)) return '';
 
   // Normalize Unicode letters with accents to ASCII
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents
@@ -1061,10 +1037,13 @@ export function escapeHTML(str: any): string {
  * @param ids - One or more selected IDs/values.
  * @returns A new array with `checked: boolean` on each item.
  */
-export function mark<T>(list: any[], ...ids: Array<string | number>): any[] {
+export function mark<T>(
+  list: any[],
+  ...ids: Array<string | number | null | undefined>
+): any[] {
   if (!isArr(list)) return [];
 
-  const selected = new Set(ids.map(String));
+  const selected = new Set(ids.filter(Boolean).map(String));
 
   return list.map((item) => {
     if (isObj(item)) {

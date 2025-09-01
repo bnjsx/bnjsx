@@ -270,8 +270,8 @@ describe('Text', () => {
       expect(toUpper('hello')).toBe('HELLO');
     });
 
-    it('should throw an error if input is not a string', () => {
-      expect(() => toUpper(123 as any)).toThrow('Invalid text: 123');
+    it('should not throw an error if input is not a string', () => {
+      expect(toUpper(123 as any)).toBe('');
     });
   });
 
@@ -280,8 +280,8 @@ describe('Text', () => {
       expect(toLower('HELLO')).toBe('hello');
     });
 
-    it('should throw an error if input is not a string', () => {
-      expect(() => toLower({} as any)).toThrow('Invalid text: [object Object]');
+    it('should not throw an error if input is not a string', () => {
+      expect(toLower({} as any)).toBe('');
     });
   });
 
@@ -290,8 +290,8 @@ describe('Text', () => {
       expect(toUpperAt('hello', 1)).toBe('hEllo');
     });
 
-    it('should throw an error if the string is not valid', () => {
-      expect(() => toUpperAt(123 as any, 1)).toThrow('Invalid text: 123');
+    it('should not throw an error if the string is invalid', () => {
+      expect(toUpperAt(123 as any, 1)).toBe('');
     });
 
     it('should return the string unchanged if index is out of bounds', () => {
@@ -302,8 +302,8 @@ describe('Text', () => {
       expect(toUpperAt('hello', 0)).toBe('Hello');
     });
 
-    it('should throw an error if the index is not an integer', () => {
-      expect(() => toUpperAt('hello', '1' as any)).toThrow('Invalid index: 1');
+    it('should not throw an error if the index is not an integer', () => {
+      expect(toUpperAt('hello', '1' as any)).toBe('Hello');
     });
   });
 
@@ -312,8 +312,8 @@ describe('Text', () => {
       expect(toLowerAt('HELLO', 1)).toBe('HeLLO');
     });
 
-    it('should throw an error if the string is not valid', () => {
-      expect(() => toLowerAt(123 as any, 1)).toThrow('Invalid text: 123');
+    it('should not throw an error if the string is invalid', () => {
+      expect(toLowerAt(123 as any, 1)).toBe('');
     });
 
     it('should return the string unchanged if index is out of bounds', () => {
@@ -324,8 +324,8 @@ describe('Text', () => {
       expect(toLowerAt('HELLO', 0)).toBe('hELLO');
     });
 
-    it('should throw an error if the index is not an integer', () => {
-      expect(() => toLowerAt('HELLO', '1' as any)).toThrow('Invalid index: 1');
+    it('should not throw an error if the index is not an integer', () => {
+      expect(toLowerAt('HELLO', '1' as any)).toBe('hELLO');
     });
   });
 
@@ -503,10 +503,8 @@ describe('Text', () => {
     });
 
     it('should throw an error if the input is not a valid string', () => {
-      expect(() => toTitle(null as any)).toThrow('Invalid text: null');
-      expect(() => toTitle(undefined as any)).toThrow(
-        'Invalid text: undefined'
-      );
+      expect(toTitle(null as any)).toBe('');
+      expect(toTitle(undefined as any)).toBe('');
     });
   });
 
@@ -525,8 +523,8 @@ describe('Text', () => {
     });
 
     it('should throw an error if the input is not a valid string', () => {
-      expect(() => toSlug(null as any)).toThrow('Invalid text: null');
-      expect(() => toSlug(undefined as any)).toThrow('Invalid text: undefined');
+      expect(toSlug(null as any)).toBe('');
+      expect(toSlug(undefined as any)).toBe('');
     });
   });
 
@@ -548,19 +546,15 @@ describe('Text', () => {
       );
     });
 
-    it('should throw an error if the length is not a valid number or is <= 0', () => {
-      expect(() => toSnap('Hello', 0)).toThrow('Invalid length: 0.');
-      expect(() => toSnap('Hello', -5)).toThrow('Invalid length: -5.');
-      expect(() => toSnap('Hello', null as any)).toThrow(
-        'Invalid length: null.'
-      );
+    it('should not throw an error if the length is invalid or is <= 0', () => {
+      expect(toSnap('Hello', 0)).toBe('Hello');
+      expect(toSnap('Hello', -5)).toBe('Hello');
+      expect(toSnap('Hello', null as any)).toBe('Hello');
     });
 
-    it('should throw an error if the input is not a valid string', () => {
-      expect(() => toSnap(null as any, 10)).toThrow('Invalid text: null');
-      expect(() => toSnap(undefined as any, 10)).toThrow(
-        'Invalid text: undefined'
-      );
+    it('should not throw an error if the input is not a valid string', () => {
+      expect(toSnap(null as any, 10)).toBe('');
+      expect(toSnap(undefined as any, 10)).toBe('');
     });
   });
 
@@ -656,6 +650,10 @@ describe('Text', () => {
 
     test('should not exceed PB in unit conversion', () => {
       expect(toSize(1024 * 1024 * 1024 * 1024 * 1024 * 2)).toBe('2.00 PB');
+    });
+
+    test('should return 1 byte for invalid inputs', () => {
+      expect(toSize('foo' as any)).toBe('1 byte');
     });
   });
 
@@ -922,9 +920,9 @@ describe('toSlug', () => {
     expect(toSlug('ÄÖÜ äöü')).toBe('aou-aou');
   });
 
-  test('throws error if input is not a string', () => {
-    expect(() => toSlug(null as any)).toThrow('Invalid text: null');
-    expect(() => toSlug(123 as any)).toThrow('Invalid text: 123');
+  test('return empty string if input is not a string', () => {
+    expect(toSlug(null as any)).toBe('');
+    expect(toSlug(123 as any)).toBe('');
   });
 });
 

@@ -5,6 +5,7 @@ import { Response } from '../modules/Response';
 import { Logger } from '../../helpers';
 
 import {
+  AppError,
   BadRequestError,
   ForbiddenError,
   MaintenanceError,
@@ -16,35 +17,43 @@ export async function error(req: Request, res: Response, err?: Error) {
 
   if (mode === 'web') {
     if (err instanceof BadRequestError) {
-      return res.status(400).render('errors.400');
+      return res.status(400).render('errors.400', { err });
     }
 
     if (err instanceof ForbiddenError) {
-      return res.status(403).render('errors.403');
+      return res.status(403).render('errors.403', { err });
     }
 
     if (err instanceof NotFoundError) {
-      return res.status(404).render('errors.404');
+      return res.status(404).render('errors.404', { err });
     }
 
     if (err instanceof MaintenanceError) {
-      return res.status(503).render('errors.503');
+      return res.status(503).render('errors.503', { err });
     }
 
-    return res.status(500).render('errors.500');
+    return res.status(500).render('errors.500', { err });
   }
 
   if (err instanceof BadRequestError) {
     return res.status(400).json({
       success: false,
-      error: { name: 'BadRequestError', message: 'Bad Request.' },
+      error: {
+        name: 'BadRequestError',
+        message: 'Bad Request.',
+        code: err.code,
+      },
     });
   }
 
   if (err instanceof ForbiddenError) {
     return res.status(403).json({
       success: false,
-      error: { name: 'ForbiddenError', message: 'Access Forbidden.' },
+      error: {
+        name: 'ForbiddenError',
+        message: 'Access Forbidden.',
+        code: err.code,
+      },
     });
   }
 
@@ -54,6 +63,7 @@ export async function error(req: Request, res: Response, err?: Error) {
       error: {
         name: 'NotFoundError',
         message: 'The requested resource could not be found.',
+        code: err.code,
       },
     });
   }
@@ -64,13 +74,18 @@ export async function error(req: Request, res: Response, err?: Error) {
       error: {
         name: 'MaintenanceError',
         message: 'The application is under maintenance.',
+        code: err.code,
       },
     });
   }
 
   return res.status(500).json({
     success: false,
-    error: { name: 'ServerError', message: 'Ops! Something went wrong.' },
+    error: {
+      name: 'ServerError',
+      message: 'Ops! Something went wrong.',
+      code: (err as AppError).code,
+    },
   });
 }
 

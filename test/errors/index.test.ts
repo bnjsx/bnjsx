@@ -1,4 +1,5 @@
 import {
+  AppError,
   BadRequestError,
   BeginTransactionError,
   CloseConnectionError,
@@ -16,6 +17,24 @@ import {
   ShutdownError,
   ValidatorError,
 } from '../../src';
+
+describe('AppError', () => {
+  test('should create an error with the default message', () => {
+    const error = new AppError();
+    expect(error.message).toBe('Something went wrong');
+    expect(error.code).toBe(undefined);
+    expect(error).toBeInstanceOf(AppError);
+  });
+
+  test('should create an error with a custom message', () => {
+    const customMessage = 'Custom error message';
+    const customCode = 'DBP';
+    const error = new AppError(customMessage, customCode);
+    expect(error.message).toBe(customMessage);
+    expect(error.code).toBe(customCode);
+    expect(error).toBeInstanceOf(AppError);
+  });
+});
 
 describe('QueryError', () => {
   test('should create an error with the default message', () => {

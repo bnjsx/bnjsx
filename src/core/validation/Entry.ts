@@ -11,6 +11,7 @@ import {
   isRegex,
   isStr,
   isUndefined,
+  toArray,
 } from '../../helpers';
 
 /**
@@ -178,7 +179,8 @@ export class Input<T> {
    *
    * @param allowed - An array of allowed values (string | number | boolean).
    */
-  public in(...allowed: Array<string | number | boolean>): this {
+  public in(allowed: Array<string | number | boolean>): Input<string> {
+    if (!isArr(allowed)) allowed = [];
     return this.apply((val) => {
       if (!allowed.includes(val)) throw new Error();
       return val;
@@ -412,7 +414,7 @@ export class Entry {
    * @param key - The key (or index, if source was an array) to extract.
    * @returns A chainable api for validation and transformation.
    */
-  ensure(key: string | number): Input<string | string[]> {
+  public ensure(key: string | number): Input<string | string[]> {
     return new Input(this.data[key] ?? null);
   }
 
@@ -422,18 +424,18 @@ export class Entry {
    * @param key - The key or index to check.
    * @returns `true` if the key exists, otherwise `false`.
    */
-  has(key: string | number): boolean {
+  public has(key: string | number): boolean {
     return isDefined(this.data[key]);
   }
 
   /**
-   * Returns the raw value for a given key or index, or `null` if not found.
+   * Returns an array of values for the given key or index.
    *
    * @param key - The key or index to retrieve.
-   * @returns The raw value or `null`.
+   * @returns The array of values.
    */
-  get<T extends unknown>(key: string | number): T {
-    return this.data[key] ?? null;
+  public all(key: string | number): Array<string> {
+    return toArray(this.data[key]);
   }
 
   /**
@@ -442,7 +444,7 @@ export class Entry {
    * @param key - The key or numeric index to retrieve from the internal data.
    * @returns A single string value or `null` if unavailable.
    */
-  one(key: string | number): string {
+  public get(key: string | number): string {
     const value = this.data[key];
 
     if (isStr(value)) return value;

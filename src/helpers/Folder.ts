@@ -12,7 +12,7 @@ export interface FolderOptions {
    * items are checked and removed automatically.
    * Default: 60 seconds.
    */
-  timeout?: number;
+  timeout?: number | boolean;
 
   /**
    * Percentage of cache files to trim when `size` is exceeded.
@@ -91,18 +91,24 @@ export class Folder {
    *
    * @param ops Optional configuration options.
    */
-  private constructor(key: string, ops?: FolderOptions) {
+  constructor(name?: string, ops?: FolderOptions) {
+    name = isStr(name) ? name : '__default__';
+
+    if (Folder.folders.has(name)) return Folder.folders.get(name);
+
     if (!isObj(ops)) ops = {};
 
     const { size, trim, timeout } = ops;
 
-    this.name = isStr(key) ? key : '__default__';
     this.size = isInt(size) && size > 0 ? size : 500;
     this.trim = isInt(trim) && trim > 0 && trim <= 100 ? trim : 10;
-    this.path = resolve(config().resolveSync(), 'cache', this.name);
+    this.path = resolve(config().resolveSync(), 'cache', name);
     this.timeout = isInt(timeout) && timeout > 0 ? timeout * 1000 : 60 * 1000;
 
-    this.startCleaning();
+    if (timeout !== false) this.startCleaning();
+
+    Folder.folders.set(name, this);
+    this.name = name;
   }
 
   /**
@@ -125,38 +131,6 @@ export class Folder {
       .slice(0, 100); // Limit length (safe on all OS)
 
     return resolve(this.path, safe + '.json');
-  }
-
-  /**
-   * Retrieves a Folder instance by key from the registry.
-   * Creates a new instance with options if it doesn't exist.
-   *
-   * @param key Optional folder instance key.
-   * @param ops Optional configuration options for the folder.
-   * @returns The existing or newly created Folder instance.
-   */
-  public static get(key?: string, ops?: FolderOptions): Folder {
-    if (isStr(key) && this.folders.has(key)) return this.folders.get(key);
-    const instance = new Folder(key, ops);
-    this.folders.set(key, instance);
-    return instance;
-  }
-
-  /**
-   * Deletes a Folder instance and its cached files by key.
-   *
-   * @param key The key of the Folder instance to delete.
-   */
-  public static async delete(key: string): Promise<void> {
-    const folder = this.folders.get(key);
-    if (!folder) return;
-
-    try {
-      await fs.rm(folder.path, { recursive: true, force: true });
-      this.folders.delete(key);
-      folder.stopCleaning();
-      folder.meta.clear();
-    } catch {}
   }
 
   /**
@@ -292,8 +266,13 @@ export class Folder {
    *
    * @returns A promise that resolves when cleanup completes.
    */
-  public clear(): Promise<void> {
-    return Folder.delete(this.name);
+  public async clear(): Promise<void> {
+    try {
+      await fs.rm(this.path, { recursive: true, force: true });
+      Folder.folders.delete(this.name);
+      this.stopCleaning();
+      this.meta.clear();
+    } catch {}
   }
 
   /**
@@ -350,4 +329,32 @@ export class Folder {
       } catch {}
     }
   }
+}
+
+/**
+ * Retrieves the `__default__` folder instance using the provided options.
+ *
+ * @param ops Configuration options for the folder.
+ * @returns A new `Store` instance.
+ */
+export function folder(ops?: FolderOptions): Folder;
+
+/**
+ * Retrieves or creates a folder instance with the given key.
+ *
+ * @param key Unique name for the folder instance.
+ * @param ops Optional configuration options for the folder.
+ * @returns The existing or newly created `Folder` instance.
+ */
+export function folder(key: string, ops?: FolderOptions): Folder;
+
+/**
+ * Retrieves a named `Folder` instance from the internal registry.
+ * If it doesn't exist yet, a new instance is created using the provided options.
+ */
+export function folder(...args: any[]): Folder {
+  const [_1, _2] = args;
+
+  if (isObj(_1)) return new Folder(null, _1);
+  return new Folder(_1, _2);
 }

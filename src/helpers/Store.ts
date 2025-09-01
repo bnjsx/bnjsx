@@ -12,7 +12,7 @@ export interface StoreOptions {
   space?: number;
 
   /** Interval (in seconds) at which expired items are cleaned up. */
-  timeout?: number;
+  timeout?: number | boolean;
 
   /** Percentage of items to remove during cleanup. Default is 10%. */
   trim?: number;
@@ -89,50 +89,23 @@ export class Store {
    * @param ops - Optional configuration object.
    * Validates and defaults to sane values if omitted or invalid.
    */
-  private constructor(key: string, ops: StoreOptions = {}) {
+  constructor(key?: string, ops?: StoreOptions) {
+    key = isStr(key) ? key : '__default__';
+
+    if (Store.stores.has(key)) return Store.stores.get(key);
+
     if (!isObj(ops)) ops = {};
 
     const { size, trim, timeout, space } = ops;
-
-    this.key = isStr(key) ? key : '__default__';
     this.size = isInt(size) && size > 0 ? size : 50_000;
     this.space = isInt(space) && space > 0 ? space : 10 * MB;
     this.timeout = isInt(timeout) && timeout > 0 ? timeout * 1000 : 60 * 1000;
     this.trim = isInt(trim) && trim > 0 && trim <= 100 ? ops.trim : 10;
 
-    this.startCleaning();
-  }
+    if (timeout !== false) this.startCleaning();
 
-  // ─── Static API ─────────────────────────────────────────────
-
-  /**
-   * Retrieves a named Store instance from the internal registry.
-   * If it doesn't exist yet, a new instance is created using the provided options.
-   *
-   * @param key Optional unique name for the store instance.
-   * @param ops Optional configuration for the new store.
-   * @returns The existing or newly created store instance.
-   */
-  public static get(key?: string, ops?: StoreOptions): Store {
-    if (isStr(key) && Store.stores.has(key)) return Store.stores.get(key);
-    const instance = new Store(key, ops);
-    Store.stores.set(key, instance);
-    return instance;
-  }
-
-  /**
-   * Deletes a named Store instance from the registry and clears its contents.
-   *
-   * @param key - The name of the store to delete.
-   */
-  public static delete(key: string): void {
-    const store = Store.stores.get(key);
-    if (!store) return;
-
-    store.memory = 0;
-    store.stopCleaning();
-    store.store.clear();
-    Store.stores.delete(key);
+    Store.stores.set(key, this);
+    this.key = key;
   }
 
   // ─── Instance API ───────────────────────────────────────────
@@ -211,10 +184,13 @@ export class Store {
   }
 
   /**
-   * Clears all entries from the store.
+   * Clear and dereference your store.
    */
   public clear(): void {
-    Store.delete(this.key);
+    this.memory = 0;
+    this.store.clear();
+    this.stopCleaning();
+    Store.stores.delete(this.key);
   }
 
   /**
@@ -255,7 +231,7 @@ export class Store {
     const keys = Array.from(this.store.keys());
     const usageStr = toSize(this.memory);
     const totalStr = toSize(this.space); // Example: "10 MB"
-    const usagePct = ((this.memory / this.space) * 100).toFixed(1);
+    const usagePct = ((this.memory / this.space) * 100).toFixed(2);
     const cleanerStr = this.cleaner
       ? `every ${this.timeout / 1000}s`
       : 'disabled';
@@ -353,4 +329,32 @@ export class Store {
       freed += entry.space;
     }
   }
+}
+
+/**
+ * Retrieves a `__default__` store instance using the provided options.
+ *
+ * @param ops Configuration options for the store.
+ * @returns A new `Store` instance.
+ */
+export function store(ops?: StoreOptions): Store;
+
+/**
+ * Retrieves or creates a store instance with the given key.
+ *
+ * @param key Unique name for the store instance.
+ * @param ops Optional configuration options for the store.
+ * @returns The existing or newly created `Store` instance.
+ */
+export function store(key: string, ops?: StoreOptions): Store;
+
+/**
+ * Retrieves a named `Store` instance from the internal registry.
+ * If it doesn't exist yet, a new instance is created using the provided options.
+ */
+export function store(...args: any[]): Store {
+  const [_1, _2] = args;
+
+  if (isObj(_1)) return new Store(null, _1);
+  return new Store(_1, _2);
 }

@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@2.0.2 - 2025-09-01**
+
+### Added
+
+- New service method: `goto(path, message, type)` – a simpler and cleaner way to redirect users with an optional flash message.
+- New `Pool` option: `shouldCheck` – controls connection checking.
+  - `true` (default): executes an extra query to verify connection health before use.
+  - `false`: disables connection checking.
+- `Validator.any()` – ensures at least one field is provided. Useful when all fields are optional.
+- `Validator.field(name, display)` and `Validator.file(name, display)` now accept an optional `display` argument to customize field names in error messages.  
+  Example: `Validator.field("username", "Le nom d'utilisateur")` → error messages will use the friendly display name.
+
+### Fixed
+
+- Fixed issue in `Form` module: now waits until all write streams are flushed before resolving, ensuring middleware logic executes only after files are fully written.
+
 ## **Bnjsx@2.0.1 - 2025-08-08**
 
 ### Fixed

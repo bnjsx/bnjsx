@@ -142,23 +142,23 @@ describe('Input', () => {
   describe('Input.in()', () => {
     it('passes if value is in allowed list', () => {
       const val = entry('dog');
-      expect(val.in('cat', 'dog', 'bird').get()).toBe('dog');
+      expect(val.in(['cat', 'dog', 'bird']).get()).toBe('dog');
     });
 
     it('fails if value is not in allowed list', () => {
       const val = entry('lion');
-      expect(val.in('cat', 'dog', 'bird').get()).toBeNull();
+      expect(val.in(['cat', 'dog', 'bird']).get()).toBeNull();
     });
 
     it('handles allowed list with numbers and booleans', () => {
-      expect(entry(5).in(1, 2, 3, 5).get()).toBe(5);
-      expect(entry(true).in(false, true).get()).toBe(true);
-      expect(entry(false).in(true).get()).toBeNull();
+      expect(entry(5).in([1, 2, 3, 5]).get()).toBe(5);
+      expect(entry(true).in([false, true]).get()).toBe(true);
+      expect(entry(false).in([true]).get()).toBeNull();
     });
 
     it('works correctly with array input, validating each item', () => {
       const val = entry(['cat', 'dog']);
-      expect(val.array().in('cat', 'dog', 'bird').get()).toEqual([
+      expect(val.array().in(['cat', 'dog', 'bird']).get()).toEqual([
         'cat',
         'dog',
       ]);
@@ -166,7 +166,13 @@ describe('Input', () => {
 
     it('fails if any array item is not in allowed list', () => {
       const val = entry(['cat', 'lion']);
-      expect(val.array().in('cat', 'dog', 'bird').get()).toBeNull();
+      expect(val.array().in(['cat', 'dog', 'bird']).get()).toBeNull();
+    });
+
+    it('fails if the list is not an array', () => {
+      const val = entry(['cat', 'lion']);
+      const target = 'foo' as any;
+      expect(val.array().in(target).get()).toBeNull();
     });
   });
 
@@ -918,6 +924,26 @@ describe('Entry', () => {
   });
 
   describe('get()', () => {
+    it('returns string if value is a string', () => {
+      const instance = entry({ a: 'hello' });
+      expect(instance.get('a')).toBe('hello');
+    });
+
+    it('returns first string if value is array', () => {
+      const instance = entry({ b: ['x', 'y'] });
+      expect(instance.get('b')).toBe('x');
+    });
+
+    it('returns null if key does not exist', () => {
+      const instance = entry({});
+      expect(instance.get('missing')).toBeNull();
+    });
+
+    it('returns null if value is neither string nor array', () => {
+      const instance = entry({ c: 123 });
+      expect(instance.get('c')).toBeNull();
+    });
+
     describe('object', () => {
       const objInstance = entry({ bar: 'zero', foo: 'bar' });
 
@@ -947,25 +973,25 @@ describe('Entry', () => {
     });
   });
 
-  describe('one()', () => {
-    it('returns string if value is a string', () => {
+  describe('all()', () => {
+    it('returns array if value is a string', () => {
       const instance = entry({ a: 'hello' });
-      expect(instance.one('a')).toBe('hello');
+      expect(instance.all('a')).toEqual(['hello']);
     });
 
-    it('returns first string if value is array', () => {
+    it('returns array if value is array', () => {
       const instance = entry({ b: ['x', 'y'] });
-      expect(instance.one('b')).toBe('x');
+      expect(instance.all('b')).toEqual(['x', 'y']);
     });
 
-    it('returns null if key does not exist', () => {
+    it('returns array if key does not exist', () => {
       const instance = entry({});
-      expect(instance.one('missing')).toBeNull();
+      expect(instance.all('missing')).toEqual([]);
     });
 
     it('returns null if value is neither string nor array', () => {
       const instance = entry({ c: 123 });
-      expect(instance.one('c')).toBeNull();
+      expect(instance.all('c')).toEqual([123]);
     });
   });
 

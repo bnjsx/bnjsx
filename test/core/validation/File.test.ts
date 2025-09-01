@@ -36,12 +36,12 @@ describe('File API', () => {
 
   describe('count()', () => {
     it('sets exact file count with default message', () => {
-      const file = validator.file('resume').count(2);
+      const file = validator.file('resume', 'Your resume').count(2);
       const options = file['state'].options;
 
       expect(options.count).toBe(2);
       expect(options.messages.count).toBe(
-        'resume must have exactly 2 file(s).'
+        'Your resume must have exactly 2 file(s).'
       );
     });
 

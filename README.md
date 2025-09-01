@@ -4,8 +4,6 @@
 
 This release introduces a powerful new architecture built around **Services** — giving you full control, better structure, and less boilerplate. Whether you're building small apps or complex systems, Bnjsx v2 gives you everything in one place.
 
----
-
 ## What’s New in Version 2
 
 Bnjsx is no longer just a lightweight framework — it's now a **full-stack powerhouse** for Node.js.
@@ -44,15 +42,11 @@ Each service combines routes, logic, database, and responses in one file, with n
 > On a project with 30 tables, you'd normally have **90+ files** (models, controllers, routers).
 > With Bnjsx services, you only need **30 clean, focused service files**.
 
----
-
 ## Documentation
 
 Docs for **version 2** are currently in progress — but you can dive into the [version 1 docs](https://github.com/bnjsx/docs) to get familiar with the core concepts.
 
 > By the time you’re done reading, version 2 docs might already be live — so go take a look!
-
----
 
 ## Installation
 
@@ -68,8 +62,6 @@ Or install the most stable v1 release:
 npm i bnjsx@1.1.2
 ```
 
----
-
 ## bnjet – Project Scaffolding
 
 Create full Bnjsx projects in seconds:
@@ -81,8 +73,6 @@ bnjet new my-app -ts      # or -js / -react / -vue (coming soon)
 
 Built-in support for Vite, Tailwind, CLI, and Jest.
 
----
-
 ## Flexer – VS Code Extension
 
 Flexer adds syntax highlighting, auto-completion, and formatting for `.fx` (Flex) templates.
@@ -90,14 +80,10 @@ Flexer adds syntax highlighting, auto-completion, and formatting for `.fx` (Flex
 Install from VS Code Marketplace:
 **Extensions → Search "Flexer" → Install**
 
----
-
 ## Contributing
 
 Thank you for your interest in contributing!
 Please check out the [contributing guidelines](CONTRIBUTING.md) before submitting issues or pull requests.
-
----
 
 ## License
 

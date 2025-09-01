@@ -19,23 +19,38 @@ jest.mock('busboy', () => {
   });
 });
 
-jest.mock('fs', () => ({
-  ...jest.requireActual('fs'),
-  createWriteStream: jest.fn(() => new EventEmitter()),
-  createReadStream: jest.fn(() => {
-    const stream: any = new EventEmitter();
-    stream.resume = jest.fn();
-    stream.pipe = jest.fn(() => {
-      stream.emit('data', Buffer.from('hello '));
-      stream.emit('data', Buffer.from('world '));
-      stream.emit('data', Buffer.from('from '));
-      stream.emit('data', Buffer.from('bnjsx.'));
-      stream.emit('end');
-    });
+jest.mock('fs', () => {
+  return {
+    ...jest.requireActual('fs'),
+    createWriteStream: jest.fn((path) => {
+      const ws: any = new EventEmitter();
+      ws.path = path;
+      ws.write = jest.fn();
+      ws.end = jest.fn(() => {
+        // mimic async finish event
+        process.nextTick(() => ws.emit('finish'));
+      });
+      ws.destroy = jest.fn();
+      return ws;
+    }),
+    createReadStream: jest.fn(() => {
+      const stream: any = new EventEmitter();
+      stream.resume = jest.fn();
+      stream.pipe = jest.fn((ws) => {
+        stream.emit('data', Buffer.from('hello '));
+        stream.emit('data', Buffer.from('world '));
+        stream.emit('data', Buffer.from('from '));
+        stream.emit('data', Buffer.from('bnjsx.'));
+        stream.emit('end');
 
-    return stream;
-  }),
-}));
+        // simulate piping calling .end() on ws
+        ws.end?.();
+        return ws;
+      });
+      return stream;
+    }),
+  };
+});
 
 jest.mock('fs/promises', () => ({
   ...jest.requireActual('fs/promises'),
@@ -169,229 +184,6 @@ describe('Form', () => {
       expect(form.req.body.tag).toEqual(['first', 'second', 'third']);
     });
   });
-
-  // describe('file', () => {
-  //   let form: any;
-
-  //   beforeEach(() => {
-  //     form = new Form();
-  //     form.req = {};
-  //     form.res = {};
-  //   });
-
-  //   test('should throw FormError if file name is not a string', () => {
-  //     expect(() => form.file(123)).toThrow(FormError);
-  //     expect(() => form.file(123)).toThrow('Invalid file name');
-  //   });
-
-  //   test('should throw FormError if options is not an object', () => {
-  //     expect(() => form.file('profile', null)).toThrow(FormError);
-  //     expect(() => form.file('profile', null)).toThrow('Invalid file options');
-  //   });
-
-  //   test('should throw FormError if file type is not an array of strings', () => {
-  //     expect(() => form.file('profile', { type: 'image/png' })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { type: 'image/png' })).toThrow(
-  //       'Invalid file type'
-  //     );
-  //   });
-
-  //   test('should set empty array as default for file type', () => {
-  //     form.file('profile');
-  //     expect(form.files.profile.type).toEqual([]);
-  //   });
-
-  //   test('should throw FormError if file count is not a positive integer', () => {
-  //     expect(() => form.file('profile', { count: -5 })).toThrow(FormError);
-  //     expect(() => form.file('profile', { count: -5 })).toThrow(
-  //       'Invalid file count'
-  //     );
-  //   });
-
-  //   test('should set default count to Number.MAX_SAFE_INTEGER', () => {
-  //     form.file('profile');
-  //     expect(form.files.profile.count).toBe(Number.MAX_SAFE_INTEGER);
-  //   });
-
-  //   test('should throw FormError if file size is not an object', () => {
-  //     expect(() => form.file('profile', { size: 500 })).toThrow(FormError);
-  //     expect(() => form.file('profile', { size: 500 })).toThrow(
-  //       'Invalid file size'
-  //     );
-  //   });
-
-  //   test('should throw FormError if min size is not an integer', () => {
-  //     expect(() => form.file('profile', { size: { min: '1MB' } })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { size: { min: '1MB' } })).toThrow(
-  //       'Invalid minimum file size'
-  //     );
-  //   });
-
-  //   test('should throw FormError if max size is not an integer', () => {
-  //     expect(() =>
-  //       form.file('profile', { size: { min: 0, max: '5MB' } })
-  //     ).toThrow(FormError);
-  //     expect(() =>
-  //       form.file('profile', { size: { min: 0, max: '5MB' } })
-  //     ).toThrow('Invalid maximum file size');
-  //   });
-
-  //   test('should throw FormError if min size is greater than max size', () => {
-  //     expect(() => form.file('profile', { size: { min: 10, max: 5 } })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { size: { min: 10, max: 5 } })).toThrow(
-  //       'File size min cannot be greater than max'
-  //     );
-  //   });
-
-  //   test('should set default file size to min: 0 and max: Number.MAX_SAFE_INTEGER', () => {
-  //     form.file('profile');
-  //     expect(form.files.profile.size).toEqual({
-  //       min: 0,
-  //       max: Number.MAX_SAFE_INTEGER,
-  //     });
-  //   });
-
-  //   test('should throw FormError if required is not a boolean', () => {
-  //     expect(() => form.file('profile', { required: 'true' })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { required: 'true' })).toThrow(
-  //       'Invalid required flag'
-  //     );
-  //   });
-
-  //   test('should set required default to false', () => {
-  //     form.file('profile');
-  //     expect(form.files.profile.required).toBe(false);
-  //   });
-
-  //   test('should throw FormError if location is not a string', () => {
-  //     expect(() => form.file('profile', { location: 123 })).toThrow(FormError);
-  //     expect(() => form.file('profile', { location: 123 })).toThrow(
-  //       'Invalid file location'
-  //     );
-  //   });
-
-  //   test('should throw FormError if location is not absolute', () => {
-  //     expect(() => form.file('profile', { location: 'relative/path' })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { location: 'relative/path' })).toThrow(
-  //       'File location path must be absolute'
-  //     );
-  //   });
-
-  //   test('should correctly resolve default location', () => {
-  //     form.file('profile');
-  //     expect(form.files.profile.location).toBe(resolve(__dirname, './uploads'));
-  //   });
-
-  //   test('should throw FormError if messages is not an object', () => {
-  //     expect(() => form.file('profile', { messages: 'invalid' })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { messages: 'invalid' })).toThrow(
-  //       'Invalid messages object'
-  //     );
-  //   });
-
-  //   test('should throw FormError if messages.count is not a string', () => {
-  //     expect(() => form.file('profile', { messages: { count: 123 } })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { messages: { count: 123 } })).toThrow(
-  //       'Invalid count message'
-  //     );
-  //   });
-
-  //   test('should throw FormError if messages.required is not a string', () => {
-  //     expect(() =>
-  //       form.file('profile', { messages: { required: 123 } })
-  //     ).toThrow(FormError);
-  //     expect(() =>
-  //       form.file('profile', { messages: { required: 123 } })
-  //     ).toThrow('Invalid required message');
-  //   });
-
-  //   test('should throw FormError if messages.type is not a string', () => {
-  //     expect(() => form.file('profile', { messages: { type: 123 } })).toThrow(
-  //       FormError
-  //     );
-  //     expect(() => form.file('profile', { messages: { type: 123 } })).toThrow(
-  //       'Invalid type message'
-  //     );
-  //   });
-
-  //   test('should throw FormError if messages.size is not an object', () => {
-  //     expect(() =>
-  //       form.file('profile', { messages: { size: 'invalid' } })
-  //     ).toThrow(FormError);
-  //     expect(() =>
-  //       form.file('profile', { messages: { size: 'invalid' } })
-  //     ).toThrow('Invalid size message object');
-  //   });
-
-  //   test('should throw FormError if messages.size.min is not a string', () => {
-  //     expect(() =>
-  //       form.file('profile', { messages: { size: { min: 123 } } })
-  //     ).toThrow(FormError);
-  //     expect(() =>
-  //       form.file('profile', { messages: { size: { min: 123 } } })
-  //     ).toThrow('Invalid min size message');
-  //   });
-
-  //   test('should throw FormError if messages.size.max is not a string', () => {
-  //     expect(() =>
-  //       form.file('profile', { messages: { size: { max: 123 } } })
-  //     ).toThrow(FormError);
-  //     expect(() =>
-  //       form.file('profile', { messages: { size: { max: 123 } } })
-  //     ).toThrow('Invalid max size message');
-  //   });
-
-  //   test('should set default messages correctly', () => {
-  //     form.file('profile', {
-  //       type: ['image/png', 'image/jpeg'],
-  //       size: { min: 100, max: 5000 },
-  //       count: 3,
-  //     });
-
-  //     expect(form.files.profile.messages).toEqual({
-  //       count: 'Too many files. Maximum allowed is 3.',
-  //       required: 'This field is required.',
-  //       type: 'File must be image/png, image/jpeg.',
-  //       size: {
-  //         min: `File must be at least ${toSize(100)}.`,
-  //         max: `File must not exceed ${toSize(5000)}.`,
-  //       },
-  //     });
-  //   });
-
-  //   test('should set default messages correctly again XD', () => {
-  //     form.file('profile', {
-  //       type: ['image/png', 'image/jpeg'],
-  //       size: { min: 100, max: 5000 },
-  //       count: 3,
-  //       messages: {},
-  //     });
-
-  //     expect(form.files.profile.messages).toEqual({
-  //       count: 'Too many files. Maximum allowed is 3.',
-  //       required: 'This field is required.',
-  //       type: 'File must be image/png, image/jpeg.',
-  //       size: {
-  //         min: `File must be at least ${toSize(100)}.`,
-  //         max: `File must not exceed ${toSize(5000)}.`,
-  //       },
-  //     });
-  //   });
-  // });
 
   describe('file', () => {
     let form: any;
@@ -774,6 +566,30 @@ describe('Form', () => {
         size: Buffer.concat(buffer).length,
         path: resolve('/tmp', '1234_1234_1234.txt'),
       });
+    });
+
+    it('should reject when there is a issue', async () => {
+      const promise = form.multipart();
+      const error = new Error('Ops');
+
+      // make issue
+      form.finalize = jest.fn(() => {
+        throw error;
+      });
+
+      // Handle field upload
+      form.bb.emit('field', 'name', 'value');
+
+      // Handle file upload
+      form.bb.emit('file', 'upload', createReadStream('test.txt'), {
+        mimeType: 'text/plain',
+        filename: 'test.txt',
+      });
+
+      // close
+      form.bb.emit('close');
+
+      await expect(promise).rejects.toBe(error);
     });
 
     it('should reject with BadRequestError for unexpected field in strict mode', async () => {

@@ -46,7 +46,7 @@ export abstract class Command {
   /**
    * Parsed arguments & options provided during command execution.
    */
-  protected static result: Result;
+  private static result: Result;
 
   /**
    * Parses the syntax string to extract command parameters.
@@ -55,7 +55,7 @@ export abstract class Command {
    * @param syntax The command syntax string to be parsed.
    * @returns An array of parsed parameters with their type and key.
    */
-  protected static parse(syntax: string): Parameters {
+  private static parse(syntax: string): Parameters {
     if (!isStr(syntax)) {
       throw new CommandError(`Invalid syntax: ${String(syntax)}`);
     }
@@ -88,7 +88,7 @@ export abstract class Command {
    * @returns The parsed result containing arguments and options.
    * @throws `CommandError` if there are too many arguments, missing required arguments, or unexpected options.
    */
-  protected static validate(params: Parameters, args: Array<string>): Result {
+  private static validate(params: Parameters, args: Array<string>): Result {
     const result: Result = {
       arguments: new Array(),
       options: new Set(),
@@ -137,7 +137,7 @@ export abstract class Command {
    * @returns The value of the argument.
    * @throws `CommandError` if the argument name is invalid or not found.
    */
-  protected static argument(name: string): string | void {
+  public static argument(name: string): string | void {
     if (!isStr(name)) {
       throw new CommandError(`Invalid argument name: ${String(name)}`);
     }
@@ -168,7 +168,7 @@ export abstract class Command {
    * @returns The value of the option.
    * @throws `CommandError` if the option name is invalid or not found.
    */
-  protected static option(name: string): boolean {
+  public static option(name: string): boolean {
     if (!isStr(name)) {
       throw new CommandError(`Invalid option name: ${String(name)}`);
     }

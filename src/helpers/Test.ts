@@ -1647,25 +1647,15 @@ export function isBuffer(value: any): value is Buffer | Uint8Array {
  *
  * @returns True if the URL is valid, matches an allowed protocol, and matches its full normalized form. False otherwise.
  **/
-export function isURL(
-  url: string,
-  protocols?: string[],
-  strict?: boolean
-): boolean {
+export function isURL(url: string, protocols?: string[]): boolean {
   if (!isStr(url)) return false;
   if (!isArrOfStr(protocols)) protocols = ['https'];
-  if (!strict) url = url.trim().toLocaleLowerCase();
 
   try {
     const parsed = new URL(url);
     const protocol = parsed.protocol.slice(0, -1).toLowerCase();
     const isAllowed = protocols.map((p) => p.toLowerCase()).includes(protocol);
-
-    if (/[\?\#]/.test(url) || url.endsWith('/')) {
-      return isAllowed && url === parsed.href;
-    }
-
-    return isAllowed && url.concat('/') === parsed.href;
+    return isAllowed;
   } catch {
     return false;
   }

@@ -8,7 +8,7 @@ import { Response } from './Response';
 import { AppOptions, config } from '../../config';
 import { isChildOf, isSubclass } from '../../helpers';
 import { bugger, orange, isPromise, isStr, isFunc, isArr } from '../../helpers';
-import { NotFoundError } from '../../errors';
+import { AppError, NotFoundError } from '../../errors';
 import { Service } from './Service';
 import { Entry } from '../validation/Entry';
 import { Middleware } from '../middlewares';
@@ -36,12 +36,6 @@ export const STOP = Symbol('STOP');
  * Emitted after the server stops successfully.
  */
 export const STOPPED = Symbol('STOPPED');
-
-/**
- * Custom error class for application-related errors.
- * Inherits from the built-in `Error` class.
- */
-export class AppError extends Error {}
 
 /**
  * A class constructor type for creating instances of a Service-based router.

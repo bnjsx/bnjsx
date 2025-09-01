@@ -949,5 +949,10 @@ describe('Redirector', () => {
         expect.any(Object)
       );
     });
+
+    test('should reject invalid arguments', () => {
+      expect(() => redirect.with(null as any)).toThrow();
+      expect(() => redirect.with('message', 123 as any)).toThrow();
+    });
   });
 });

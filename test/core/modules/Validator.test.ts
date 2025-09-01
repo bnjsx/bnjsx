@@ -347,16 +347,18 @@ describe('Validator', () => {
     });
   });
 
-  test('throws if file name is not string', () => {
-    expect(() => validator.file(123 as any)).toThrow(ValidatorError);
-    expect(() => validator.file(null as any)).toThrow(ValidatorError);
-    expect(() => validator.file({} as any)).toThrow(ValidatorError);
-  });
+  describe('file() & filed()', () => {
+    test('throws if file name is not string', () => {
+      expect(() => validator.file(123 as any)).toThrow(ValidatorError);
+      expect(() => validator.file(null as any)).toThrow(ValidatorError);
+      expect(() => validator.file({} as any)).toThrow(ValidatorError);
+    });
 
-  test('throws if field name is not string', () => {
-    expect(() => validator.field(123 as any)).toThrow(ValidatorError);
-    expect(() => validator.field(null as any)).toThrow(ValidatorError);
-    expect(() => validator.field({} as any)).toThrow(ValidatorError);
+    test('throws if field name is not string', () => {
+      expect(() => validator.field(123 as any)).toThrow(ValidatorError);
+      expect(() => validator.field(null as any)).toThrow(ValidatorError);
+      expect(() => validator.field({} as any)).toThrow(ValidatorError);
+    });
   });
 
   describe('get()', () => {
@@ -383,6 +385,19 @@ describe('Validator', () => {
 
     test('throws if key is not a string', () => {
       expect(() => validator.has(123 as any)).toThrow(ValidatorError);
+    });
+  });
+
+  describe('any()', () => {
+    test('returns false if no fields', () => {
+      expect(validator.any()).toBe(false);
+    });
+
+    test('returns true if fields exists', () => {
+      validator.field('name').required();
+      validator['data']['name'] = 'simon';
+
+      expect(validator.any()).toBe(true);
     });
   });
 
@@ -511,6 +526,27 @@ describe('ValidatorGetter', () => {
       });
 
       expect(getter.errorList()).toEqual(['required', 'invalid']);
+    });
+
+    test('returns specified number of error messages', () => {
+      const getter = new ValidatorGetter({
+        errors: {
+          name: ['required'],
+          email: ['invalid'],
+          password: ['missing'],
+        },
+      });
+
+      expect(getter.errorList(1)).toEqual(['required']);
+      expect(getter.errorList(2)).toEqual(['required', 'invalid']);
+      expect(getter.errorList(3)).toEqual(['required', 'invalid', 'missing']);
+      expect(getter.errorList(100)).toEqual(['required', 'invalid', 'missing']);
+      expect(getter.errorList(0)).toEqual(['required', 'invalid', 'missing']); // ignored
+      expect(getter.errorList('hi' as any)).toEqual([
+        'required',
+        'invalid',
+        'missing',
+      ]);
     });
   });
 

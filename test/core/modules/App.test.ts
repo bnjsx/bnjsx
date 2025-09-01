@@ -88,7 +88,6 @@ jest.mock('crypto', () => ({
 
 import {
   App,
-  AppError,
   appKey,
   START,
   STARTED,
@@ -96,11 +95,7 @@ import {
   STOPPED,
 } from '../../../src/core/modules/App';
 
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from '../../../src/errors';
+import { NotFoundError, AppError } from '../../../src/errors';
 
 import { Router } from '../../../src/core/modules/Router';
 import { Service } from '../../../src/core/modules/Service';

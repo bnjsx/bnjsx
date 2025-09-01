@@ -229,15 +229,35 @@ export interface PoolConnection {
  * @property `extraDelay` - Additional time (ms) added between retry attempts.
  */
 export interface PoolOptions {
+  /** Max number of connections to create in the pool */
   maxConnection?: number;
+
+  /** Lifetime (ms) of idle connections before closure */
   maxIdleTime?: number;
+
+  /** Should requests be queued if no idle connections are available */
   shouldQueue?: boolean;
+
+  /** Max number of connection requests that can be queued */
   maxQueueSize?: number;
+
+  /** Max time (ms) a request can remain queued before rejection */
   maxQueueTime?: number;
+
+  /** Whether to retry connection creation and closing on failure */
   shouldRetry?: boolean;
+
+  /** Max number of times to retry connection creation and closing failure */
   maxRetry?: number;
+
+  /** Max time (ms) to wait between retry attempts */
   retryDelay?: number;
+
+  /** Additional time (ms) added between retry attempts */
   extraDelay?: number;
+
+  /** Should the pool check connections before use */
+  shouldCheck?: boolean;
 }
 
 const createPendingConnection = (inner: Connection): PendingConnection => {
@@ -666,6 +686,10 @@ export class Pool extends EventEmitter {
       clone.extraDelay = 500;
     }
 
+    if (!isBool(clone.shouldCheck)) {
+      clone.shouldCheck = true;
+    }
+
     this.driver = driver;
     this.options = clone;
     this.id = Symbol('Pool');
@@ -829,6 +853,19 @@ export class Pool extends EventEmitter {
   }
 
   /**
+   * Verifies the database connection by executing a simple query (`SELECT 1;`).
+   *
+   * @param connection - The active database connection instance to validate.
+   * @returns Resolves if the connection is working, rejects if the query fails.
+   */
+  private check(connection: Connection): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.options.shouldCheck) return resolve();
+      return connection.query('SELECT 1;').then(resolve).catch(reject);
+    });
+  }
+
+  /**
    * Request a connection from the pool
    *
    * @returns Promise resolves with a connection
@@ -849,8 +886,7 @@ export class Pool extends EventEmitter {
         const { connection, id } = this.idleConnections.shift();
         clearTimeout(id);
 
-        return connection
-          .query('SELECT 1;') // Check connection
+        return this.check(connection)
           .then(() => {
             const inner = connection;
             const outter = createPoolConnection(this, inner);

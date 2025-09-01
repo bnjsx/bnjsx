@@ -745,19 +745,6 @@ describe('isURL', () => {
     expect(isURL('ftp://example.com', ['ftp'])).toBe(true);
   });
 
-  test('passes strict mode only when url matches parsed.href exactly (with trailing slash)', () => {
-    const url = 'https://example.com/';
-    expect(isURL(url, ['https'], true)).toBe(true);
-    expect(isURL('https://EXAMPLE.com/', ['https'], true)).toBe(false); // case-sensitive
-    expect(isURL(' https://example.com/ ', ['https'], true)).toBe(false); // space-sensitive
-  });
-
-  test('rejects invalid URLs with invalid characters', () => {
-    const url =
-      "https://localhost/foo\xa41```''a'a;slslslsoowiwuu26y252557322o,ss";
-    expect(isURL(url)).toBe(false);
-  });
-
   test('accepts localhost with valid protocol', () => {
     expect(isURL('https://localhost')).toBe(true);
     expect(isURL('http://localhost', ['http'])).toBe(true);

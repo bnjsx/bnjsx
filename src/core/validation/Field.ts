@@ -51,10 +51,18 @@ class ArrayField {
    * @param optional - Whether the field is optional (affects how required checks are handled).
    */
   constructor(
-    private state: { name: string; testers: Tester[] },
+    private state: { name: string; display: string; testers: Tester[] },
     private messages: ValidationMessages,
     private optional: boolean
   ) {}
+
+  /**
+   * Get the field name to display in error messages.
+   */
+  private getName(): string {
+    if (isStr(this.state.display)) return this.state.display;
+    return this.state.name;
+  }
 
   /**
    * Registers a custom validation function.
@@ -98,7 +106,7 @@ class ArrayField {
     return this.test(
       (v) => isArr(v) && v.length >= length,
       message ??
-        format(this.messages.array.min, { field: this.state.name, length })
+        format(this.messages.array.min, { field: this.getName(), length })
     );
   }
 
@@ -115,7 +123,7 @@ class ArrayField {
     return this.test(
       (v) => isArr(v) && v.length <= length,
       message ??
-        format(this.messages.array.max, { field: this.state.name, length })
+        format(this.messages.array.max, { field: this.getName(), length })
     );
   }
 
@@ -135,7 +143,7 @@ class ArrayField {
     return this.test(
       (v) => isArr(v) && v.length === length,
       message ??
-        format(this.messages.array.length, { field: this.state.name, length })
+        format(this.messages.array.length, { field: this.getName(), length })
     );
   }
 
@@ -149,7 +157,7 @@ class ArrayField {
   public includes(value: any, message?: string): this {
     return this.test((v) => {
       return isFullArr(v) && v.includes(value);
-    }, message ?? format(this.messages.array.includes, { field: this.state.name, value }));
+    }, message ?? format(this.messages.array.includes, { field: this.getName(), value }));
   }
 
   /**
@@ -161,7 +169,7 @@ class ArrayField {
   public unique(message?: string): this {
     return this.test((v) => {
       return isFullArr(v) && new Set(v).size === v.length;
-    }, message ?? format(this.messages.array.unique, { field: this.state.name }));
+    }, message ?? format(this.messages.array.unique, { field: this.getName() }));
   }
 
   /**
@@ -173,7 +181,7 @@ class ArrayField {
   public ofString(message?: string): this {
     return this.test((v) => {
       return isFullArr(v) && v.every((i) => isStr(i) && isNaN(Number(i)));
-    }, message ?? format(this.messages.array.ofString, { field: this.state.name }));
+    }, message ?? format(this.messages.array.ofString, { field: this.getName() }));
   }
 
   /**
@@ -189,8 +197,7 @@ class ArrayField {
         v.every(
           (i) => isNum(i) || (isStr(i) && i.trim() !== '' && !isNaN(Number(i)))
         ),
-      message ??
-        format(this.messages.array.ofNumber, { field: this.state.name })
+      message ?? format(this.messages.array.ofNumber, { field: this.getName() })
     );
   }
 
@@ -207,7 +214,7 @@ class ArrayField {
         v.every(
           (i) => (isNum(i) && i > 0) || (isStr(i) && /^[1-9][0-9]*$/.test(i))
         ),
-      message ?? format(this.messages.array.ofIds, { field: this.state.name })
+      message ?? format(this.messages.array.ofIds, { field: this.getName() })
     );
   }
 
@@ -224,8 +231,7 @@ class ArrayField {
         v.every(
           (i) => i !== null && i !== undefined && i.toString().trim().length > 0
         ),
-      message ??
-        format(this.messages.array.notEmpty, { field: this.state.name })
+      message ?? format(this.messages.array.notEmpty, { field: this.getName() })
     );
   }
 
@@ -239,7 +245,7 @@ class ArrayField {
   public some(test: (item: any, body: any) => boolean, message?: string): this {
     return this.test((v, b) => {
       return isFullArr(v) && isFunc(test) && v.some((i) => test(i, b));
-    }, message ?? format(this.messages.array.some, { field: this.state.name }));
+    }, message ?? format(this.messages.array.some, { field: this.getName() }));
   }
 
   /**
@@ -252,7 +258,7 @@ class ArrayField {
   public none(test: (item: any, body: any) => boolean, message?: string): this {
     return this.test((v, b) => {
       return isFullArr(v) && isFunc(test) && !v.some((i) => test(i, b));
-    }, message ?? format(this.messages.array.none, { field: this.state.name }));
+    }, message ?? format(this.messages.array.none, { field: this.getName() }));
   }
 
   /**
@@ -265,7 +271,7 @@ class ArrayField {
   public all(test: (item: any, body: any) => boolean, message?: string): this {
     return this.test((v, b) => {
       return isFullArr(v) && isFunc(test) && v.every((i) => test(i, b));
-    }, message ?? format(this.messages.array.all, { field: this.state.name }));
+    }, message ?? format(this.messages.array.all, { field: this.getName() }));
   }
 
   /**
@@ -324,6 +330,11 @@ export class Field {
     name: null as string,
 
     /**
+     * The name to display in error messages.
+     */
+    display: null as string,
+
+    /**
      * Array of test functions used to validate the field's value.
      */
     testers: [] as Tester[],
@@ -347,7 +358,7 @@ export class Field {
    * @param name - The name of the field being validated.
    * @param messages - Error message templates for this field.
    */
-  constructor(name: string, messages: ValidationMessages) {
+  constructor(name: string, messages: ValidationMessages, display?: string) {
     if (!isStr(name)) {
       throw new ValidatorError(`Invalid field name: ${String(name)}`);
     }
@@ -357,7 +368,13 @@ export class Field {
     }
 
     this.state.name = name;
+    this.state.display = display;
     this.messages = messages;
+  }
+
+  private getName(): string {
+    if (isStr(this.state.display)) return this.state.display;
+    return this.state.name;
   }
 
   /**
@@ -399,7 +416,7 @@ export class Field {
     };
 
     message =
-      message || format(this.messages.array.type, { field: this.state.name });
+      message || format(this.messages.array.type, { field: this.getName() });
 
     this.state.testers.push({ test, message });
 
@@ -460,7 +477,7 @@ export class Field {
 
     return this.test(
       (v) => v !== undefined && v !== null && v.toString().trim().length > 0,
-      message ?? format(this.messages.required, { field: this.state.name })
+      message ?? format(this.messages.required, { field: this.getName() })
     );
   }
 
@@ -478,7 +495,7 @@ export class Field {
       if (!isStr(v)) return false;
       const val = this.shouldTrim ? v.trim() : v;
       return val.length >= length;
-    }, message ?? format(this.messages.min, { field: this.state.name, length }));
+    }, message ?? format(this.messages.min, { field: this.getName(), length }));
   }
 
   /**
@@ -495,7 +512,7 @@ export class Field {
       if (!isStr(v)) return false;
       const val = this.shouldTrim ? v.trim() : v;
       return val.length <= length;
-    }, message ?? format(this.messages.max, { field: this.state.name, length }));
+    }, message ?? format(this.messages.max, { field: this.getName(), length }));
   }
 
   /**
@@ -514,7 +531,7 @@ export class Field {
       if (!isStr(v)) return false;
       const val = this.shouldTrim ? v.trim() : v;
       return val.length === length;
-    }, message ?? format(this.messages.length, { field: this.state.name, length }));
+    }, message ?? format(this.messages.length, { field: this.getName(), length }));
   }
 
   /**
@@ -531,7 +548,7 @@ export class Field {
 
     return this.test(
       (v) => isStr(v) && regex.test(v),
-      message ?? format(this.messages.is, { field: this.state.name })
+      message ?? format(this.messages.is, { field: this.getName() })
     );
   }
 
@@ -549,7 +566,7 @@ export class Field {
 
     return this.test(
       (v) => isStr(v) && !regex.test(v),
-      message ?? format(this.messages.is, { field: this.state.name })
+      message ?? format(this.messages.is, { field: this.getName() })
     );
   }
 
@@ -564,7 +581,7 @@ export class Field {
   public hasLower(message?: string): this {
     return this.is(
       /[a-z]+/,
-      message ?? format(this.messages.hasLower, { field: this.state.name })
+      message ?? format(this.messages.hasLower, { field: this.getName() })
     );
   }
 
@@ -579,7 +596,7 @@ export class Field {
   public hasUpper(message?: string): this {
     return this.is(
       /[A-Z]+/,
-      message ?? format(this.messages.hasUpper, { field: this.state.name })
+      message ?? format(this.messages.hasUpper, { field: this.getName() })
     );
   }
 
@@ -594,7 +611,7 @@ export class Field {
   public hasLetter(message?: string): this {
     return this.is(
       /[a-zA-Z]/,
-      message ?? format(this.messages.hasLetter, { field: this.state.name })
+      message ?? format(this.messages.hasLetter, { field: this.getName() })
     );
   }
 
@@ -609,7 +626,7 @@ export class Field {
   public hasNumber(message?: string): this {
     return this.is(
       /[0-9]/,
-      message ?? format(this.messages.hasNumber, { field: this.state.name })
+      message ?? format(this.messages.hasNumber, { field: this.getName() })
     );
   }
 
@@ -624,7 +641,7 @@ export class Field {
   public hasSpecial(message?: string): this {
     return this.is(
       /[!@#$%^&*()\-_,.?":{}|<>]/,
-      message ?? format(this.messages.hasSpecial, { field: this.state.name })
+      message ?? format(this.messages.hasSpecial, { field: this.getName() })
     );
   }
 
@@ -639,7 +656,7 @@ export class Field {
   public hasSpace(message?: string): this {
     return this.is(
       /\s/,
-      message ?? format(this.messages.hasSpace, { field: this.state.name })
+      message ?? format(this.messages.hasSpace, { field: this.getName() })
     );
   }
 
@@ -657,7 +674,7 @@ export class Field {
       .max(max)
       .is(
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        message ?? format(this.messages.email, { field: this.state.name })
+        message ?? format(this.messages.email, { field: this.getName() })
       );
   }
 
@@ -672,7 +689,7 @@ export class Field {
   public path(message?: string): this {
     return this.is(
       /^\/[^\s?#]*$/,
-      message ?? format(this.messages.path, { field: this.state.name })
+      message ?? format(this.messages.path, { field: this.getName() })
     );
   }
 
@@ -686,8 +703,8 @@ export class Field {
    */
   public url(message?: string): this {
     return this.test(
-      (url: string) => isURL(url, ['http', 'https'], true),
-      message ?? format(this.messages.url, { field: this.state.name })
+      (url: string) => isURL(url, ['http', 'https']),
+      message ?? format(this.messages.url, { field: this.getName() })
     );
   }
 
@@ -703,7 +720,7 @@ export class Field {
   public href(message?: string): this {
     return this.is(
       /^\/[^\s?#]*(\?[^#\s]*)?$/,
-      message ?? format(this.messages.href, { field: this.state.name })
+      message ?? format(this.messages.href, { field: this.getName() })
     );
   }
 
@@ -720,7 +737,7 @@ export class Field {
   public route(message?: string): this {
     return this.is(
       /^\/[a-zA-Z0-9\/\-]+$/,
-      message ?? format(this.messages.route, { field: this.state.name })
+      message ?? format(this.messages.route, { field: this.getName() })
     );
   }
 
@@ -733,7 +750,7 @@ export class Field {
   public alpha(message?: string): this {
     return this.is(
       /^[A-Za-z]+$/,
-      message ?? format(this.messages.alpha, { field: this.state.name })
+      message ?? format(this.messages.alpha, { field: this.getName() })
     );
   }
 
@@ -746,7 +763,7 @@ export class Field {
   public alphaNum(message?: string): this {
     return this.is(
       /^[A-Za-z0-9]+$/,
-      message ?? format(this.messages.alphaNum, { field: this.state.name })
+      message ?? format(this.messages.alphaNum, { field: this.getName() })
     );
   }
 
@@ -759,7 +776,7 @@ export class Field {
   public phone(message?: string): this {
     return this.is(
       /^\+[1-9]\d{7,14}$/,
-      message ?? format(this.messages.phone, { field: this.state.name })
+      message ?? format(this.messages.phone, { field: this.getName() })
     );
   }
 
@@ -772,7 +789,7 @@ export class Field {
   public hex(message?: string): this {
     return this.is(
       /^#([0-9A-Fa-f]{3}){1,2}$/,
-      message ?? format(this.messages.hex, { field: this.state.name })
+      message ?? format(this.messages.hex, { field: this.getName() })
     );
   }
 
@@ -787,7 +804,7 @@ export class Field {
       if (isStr(v)) v = Number(v.trim());
       if (isInt(v) && v > 0) return true;
       return false;
-    }, message ?? format(this.messages.id, { field: this.state.name }));
+    }, message ?? format(this.messages.id, { field: this.getName() }));
   }
 
   /**
@@ -800,7 +817,7 @@ export class Field {
     return this.test((v) => {
       if (isNum(v)) return true;
       return isStr(v) && v.length > 0 && !isNaN(Number(v));
-    }, message ?? format(this.messages.number, { field: this.state.name }));
+    }, message ?? format(this.messages.number, { field: this.getName() }));
   }
 
   /**
@@ -819,7 +836,7 @@ export class Field {
       if (!isStr(v) && !isNum(v)) return false;
       const num = Number(v);
       return !isNaN(num) && num >= min && num <= max;
-    }, message ?? format(this.messages.between, { field: this.state.name, min, max }));
+    }, message ?? format(this.messages.between, { field: this.getName(), min, max }));
   }
 
   /**
@@ -833,7 +850,7 @@ export class Field {
       if (isInt(v)) return true;
       if (!isStr(v)) return false;
       return isInt(Number(v));
-    }, message ?? format(this.messages.integer, { field: this.state.name }));
+    }, message ?? format(this.messages.integer, { field: this.getName() }));
   }
 
   /**
@@ -847,7 +864,7 @@ export class Field {
       if (isFloat(v)) return true;
       if (!isStr(v)) return false;
       return isFloat(Number(v));
-    }, message ?? format(this.messages.float, { field: this.state.name }));
+    }, message ?? format(this.messages.float, { field: this.getName() }));
   }
 
   /**
@@ -860,7 +877,7 @@ export class Field {
     return this.test((v) => {
       if (isNum(v) && v > 0) return true;
       return isStr(v) && v.trim() !== '' && !isNaN(Number(v)) && Number(v) > 0;
-    }, message ?? format(this.messages.positive, { field: this.state.name }));
+    }, message ?? format(this.messages.positive, { field: this.getName() }));
   }
 
   /**
@@ -873,7 +890,7 @@ export class Field {
     return this.test((v) => {
       if (isNum(v) && v < 0) return true;
       return isStr(v) && v.trim() !== '' && !isNaN(Number(v)) && Number(v) < 0;
-    }, message ?? format(this.messages.negative, { field: this.state.name }));
+    }, message ?? format(this.messages.negative, { field: this.getName() }));
   }
 
   /**
@@ -898,7 +915,7 @@ export class Field {
         'on',
         'off',
       ].includes(isStr(v) ? v.trim().toLowerCase() : v);
-    }, message ?? format(this.messages.boolean, { field: this.state.name }));
+    }, message ?? format(this.messages.boolean, { field: this.getName() }));
   }
 
   /**
@@ -917,7 +934,7 @@ export class Field {
       (v) => allowed.includes(v),
       message ??
         format(this.messages.in, {
-          field: this.state.name,
+          field: this.getName(),
           values: allowed.join(', '),
         })
     );
@@ -933,7 +950,7 @@ export class Field {
     return this.test((v) => {
       if (!isStr(v) && !isNum(v)) return false;
       return !isNaN(new Date(v).getTime());
-    }, message ?? format(this.messages.date, { field: this.state.name }));
+    }, message ?? format(this.messages.date, { field: this.getName() }));
   }
 
   /**
@@ -949,7 +966,7 @@ export class Field {
         /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v) &&
         !isNaN(new Date(v.replace(' ', 'T')).getTime())
       );
-    }, message ?? format(this.messages.datetime, { field: this.state.name }));
+    }, message ?? format(this.messages.datetime, { field: this.getName() }));
   }
 
   /**
@@ -967,7 +984,7 @@ export class Field {
       } catch {
         return false;
       }
-    }, message ?? format(this.messages.json, { field: this.state.name }));
+    }, message ?? format(this.messages.json, { field: this.getName() }));
   }
 
   /**
@@ -998,7 +1015,7 @@ export class Field {
       }
 
       return sum % 10 === 0;
-    }, message ?? format(this.messages.creditCard, { field: this.state.name }));
+    }, message ?? format(this.messages.creditCard, { field: this.getName() }));
   }
 
   /**
@@ -1012,7 +1029,7 @@ export class Field {
     return this.test((v, body) => {
       const other = body[field];
       return v === (other ?? null);
-    }, message ?? format(this.messages.match, { field: this.state.name, matchField: field }));
+    }, message ?? format(this.messages.match, { field: this.getName(), matchField: field }));
   }
 
   /**
@@ -1030,7 +1047,7 @@ export class Field {
     return this.is(
       new RegExp(`^[a-zA-Z0-9_-]{${min},${max}}$`),
       message ??
-        format(this.messages.username, { field: this.state.name, min, max })
+        format(this.messages.username, { field: this.getName(), min, max })
     );
   }
 

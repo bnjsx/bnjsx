@@ -1,10 +1,10 @@
 import { Validator } from '../../../src/core/modules/Validator';
 import { Field } from '../../../src/core/validation/Field';
 
-function field(name = 'field') {
+function field(name = 'field', display?: string) {
   // @ts-ignore
   const validator = new Validator({}, {});
-  return validator.field(name);
+  return validator.field(name, display);
 }
 
 describe('Field', () => {
@@ -38,6 +38,21 @@ describe('Field', () => {
       expect(() => {
         new Field('tags', 'oops' as any);
       }).toThrow('Invalid field messages: oops');
+    });
+  });
+
+  describe('display', () => {
+    it('should use display in error messages', () => {
+      expect(
+        field('email', 'The email address').email(3, 16).run({ email: 'foo' })
+      ).toEqual(['The email address must be a valid email address.']);
+
+      expect(
+        field('ids', 'The array of ids')
+          .array({ force: true })
+          .ofIds()
+          .run({ ids: 'foo' })
+      ).toEqual(['The array of ids must contain valid IDs.']);
     });
   });
 

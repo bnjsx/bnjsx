@@ -1,5 +1,6 @@
 import { QueryError } from '../../errors';
 import {
+  isArr,
   isBool,
   isDefined,
   isFullStr,
@@ -58,11 +59,11 @@ export const ASC = Symbol('ASC');
  *   },
  * };
  */
-export interface Pagination<R> {
+export interface Pagination<R = Row> {
   result: Array<R>;
   page: {
     prev: number | void;
-    next: number; // next page number
+    next: number | void; // next page number
     current: number; // current page number
     items: number; // items per page
   };
@@ -417,6 +418,7 @@ export class Select extends Query<Rows> {
     });
 
     this.state.columns = columns;
+
     return this;
   }
 
@@ -825,7 +827,7 @@ export class Select extends Query<Rows> {
 
       this.connection
         .query(query, values)
-        .then((r) => resolve(r[0].count))
+        .then((r) => resolve(r[0]?.count || 0))
         .catch(reject);
     });
   }

@@ -1,4 +1,4 @@
-import { isArr, isFunc, isInt, isObj, isStr, isSubclass } from '../../helpers';
+import { isFunc, isInt, isObj, isStr, isSubclass } from '../../helpers';
 import { AppOptions, config } from '../../config';
 import { UTC } from '../../helpers/UTC';
 import { Logger } from '../../helpers/Logger';
@@ -7,14 +7,12 @@ import { Redirector, Response } from './Response';
 import { Validator } from './Validator';
 import { Table, TableFinder } from './Table';
 import { Router } from './Router';
-import { render } from '../template/Component';
-import { FLASH_GET_KEY, FLASH_SET_KEY } from '../middlewares/flash';
+import { FLASH_SET_KEY } from '../middlewares/flash';
 import { Fetcher } from './Fetcher';
 import { FileOptions, Form } from './Form';
-import { lang, Lang } from '../../helpers/Lang';
 import { resolve, normalize, relative, sep, isAbsolute } from 'path';
-import { Store, StoreOptions } from '../../helpers/Store';
-import { Folder, FolderOptions } from '../../helpers/Folder';
+import { store, Store, StoreOptions } from '../../helpers/Store';
+import { folder, Folder, FolderOptions } from '../../helpers/Folder';
 import { Builder } from './Builder';
 import { Entry } from '../validation/Entry';
 import { ValidatorError } from '../../errors';
@@ -57,6 +55,12 @@ export class Service extends Router {
   /** The HTTP response object for sending responses. */
   public response: Response;
 
+  /** The HTTP request object for the current request. */
+  public req: Request;
+
+  /** The HTTP response object for sending responses. */
+  public res: Response;
+
   /** Parsed route parameters extracted from the URL path. */
   public params: Entry;
 
@@ -89,6 +93,8 @@ export class Service extends Router {
 
     this.request = request;
     this.response = response;
+    this.req = request;
+    this.res = response;
 
     this.config = config().loadSync();
     this.root = config().resolveSync();
@@ -174,14 +180,32 @@ export class Service extends Router {
 
     return '/' + rel.split(sep).join('/');
   }
+
   /**
    * Get a Redirector to handle HTTP redirects.
    *
    * @returns `Redirector` instance tied to the response.
    */
   protected redirect(path?: string): Redirector {
-    if (isStr(path)) return this.response.redirect().to(path);
-    return this.response.redirect();
+    return this.response.redirect(path);
+  }
+
+  /**
+   * Redirect to the specified path with an optional flash message.
+   *
+   * @param path - The target path to redirect the user to.
+   * @param message - Optional flash message to display.
+   * @param  type - The flash message type (Defaults to `"success"`).
+   * @returns Resolves once the redirect response has been sent.
+   */
+  protected goto(
+    path: string,
+    message?: string,
+    type?: 'success' | 'error' | 'info'
+  ): Promise<void> {
+    const redirect = this.response.redirect(path);
+    if (isStr(message)) redirect.with(message, type || 'success');
+    return redirect.send();
   }
 
   /**
@@ -266,7 +290,7 @@ export class Service extends Router {
    * @returns `Folder` instance.
    */
   protected folder(key?: string, options?: FolderOptions): Folder {
-    return Folder.get(key, options);
+    return folder(key, options);
   }
 
   /**
@@ -277,37 +301,35 @@ export class Service extends Router {
    * @returns `Store` instance.
    */
   protected store(key?: string, options?: StoreOptions): Store {
-    return Store.get(key, options);
+    return store(key, options);
   }
 
   /**
-   * Render a template view with optional local variables and string replacements.
+   * Renders the component and sends the resulting HTML as the response.
    *
-   * Injects flash messages from the request into the locals as `flash`.
-   * Sets the response header `Content-Type` to `text/html`.
-   *
-   * @param path - The path of the template to render.
-   * @param locals - Optional local variables to pass to the template.
-   * @param replacements - Optional string replacements to apply during rendering.
-   * @returns The rendered HTML content as a string.
+   * @param path The file path to the Flex component to be rendered.
+   * @param locals An optional object containing local variables to be passed to the component
+   * @param replacements An optional object containing replacements to be applied during rendering.
+   * @returns A promise that resolves after sending the response.
    */
   protected async render(
     path: string,
-    locals?: Record<string, any>,
-    replacements?: Record<string, string>
-  ): Promise<string> {
-    const flash = this.request[FLASH_GET_KEY] || [];
-    const csrf = this.request.csrfToken;
+    locals?: Record<string, any>
+  ): Promise<void> {
+    return this.response.render(path, locals);
+  }
 
-    if (!isObj(locals)) locals = {};
-    if (isArr(locals.flash)) flash.push(...locals.flash);
-
-    locals.flash = flash;
-    locals.csrf = csrf;
-
-    const page = await render(path, locals, replacements);
-    this.response.setHeader('Content-Type', 'text/html');
-    return page;
+  /**
+   * Sends a JSON response.
+   * This method sets the Content-Type header to application/json and serializes the provided data before sending it in the response.
+   *
+   * @param data The data to be serialized and sent as JSON.
+   * @returns A promise that resolves after sending the response.
+   */
+  protected async json(
+    data: Record<string, unknown> | unknown[]
+  ): Promise<void> {
+    return this.response.json(data);
   }
 
   /**

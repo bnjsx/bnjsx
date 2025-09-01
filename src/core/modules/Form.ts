@@ -10,6 +10,7 @@ import { unlink } from 'fs/promises';
 import { BadRequestError } from '../../errors';
 import busboy, { Busboy } from 'busboy';
 import { json } from '../middlewares';
+import { once } from 'events';
 
 /** One Kilobyte (KB) is equal to 1024 bytes. */
 export const KB = 1024; // Kilobyte
@@ -396,7 +397,18 @@ export class Form {
         (e) => !this.issue && ((this.issue = true), reject(e))
       );
 
-      this.bb.on('close', () => !this.issue && this.finalize(resolve, reject));
+      this.bb.on('close', async () => {
+        if (!this.issue) {
+          try {
+            // wait for all writeStreams to finish flushing
+            await Promise.all(this.streams.map((ws) => once(ws, 'finish')));
+            this.finalize(resolve, reject);
+          } catch (e) {
+            this.issue = true;
+            reject(e);
+          }
+        }
+      });
 
       this.res.on('finish', () => {
         if (this.issue) {

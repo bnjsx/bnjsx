@@ -43,31 +43,41 @@ describe('error middleware', () => {
     it('renders 400 page for BadRequestError', async () => {
       await error(req, res, new BadRequestError());
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.render).toHaveBeenCalledWith('errors.400');
+      expect(res.render).toHaveBeenCalledWith('errors.400', {
+        err: expect.any(Object),
+      });
     });
 
     it('renders 403 page for ForbiddenError', async () => {
       await error(req, res, new ForbiddenError());
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.render).toHaveBeenCalledWith('errors.403');
+      expect(res.render).toHaveBeenCalledWith('errors.403', {
+        err: expect.any(Object),
+      });
     });
 
     it('renders 404 page for NotFoundError', async () => {
       await error(req, res, new NotFoundError());
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.render).toHaveBeenCalledWith('errors.404');
+      expect(res.render).toHaveBeenCalledWith('errors.404', {
+        err: expect.any(Object),
+      });
     });
 
     it('renders 503 page for MaintenanceError', async () => {
       await error(req, res, new MaintenanceError());
       expect(res.status).toHaveBeenCalledWith(503);
-      expect(res.render).toHaveBeenCalledWith('errors.503');
+      expect(res.render).toHaveBeenCalledWith('errors.503', {
+        err: expect.any(Object),
+      });
     });
 
     it('renders 500 page for generic error', async () => {
       await error(req, res, new Error('Unknown'));
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.render).toHaveBeenCalledWith('errors.500');
+      expect(res.render).toHaveBeenCalledWith('errors.500', {
+        err: expect.any(Object),
+      });
     });
   });
 

@@ -4,7 +4,7 @@ import * as path from 'path';
 jest.useFakeTimers();
 jest.spyOn(global, 'setInterval');
 
-import { Folder } from '../../src/helpers/Folder';
+import { folder, Folder } from '../../src/helpers/Folder';
 import { config } from '../../src/config';
 
 const root = config().resolveSync();
@@ -26,198 +26,192 @@ describe('Folder', () => {
 
   describe('.get()', () => {
     test('returns same instance for same key', () => {
-      const a = Folder.get('abc');
-      const b = Folder.get('abc');
+      const a = folder('abc');
+      const b = folder('abc');
       expect(a).toBe(b);
     });
 
     test('creates default instance with "__default__" key', () => {
-      const folder = Folder.get();
-      expect(folder).toBeInstanceOf(Folder);
-      expect(folder['name']).toBe('__default__');
+      const dir = folder();
+      expect(dir).toBeInstanceOf(Folder);
+      expect(dir['name']).toBe('__default__');
     });
 
     test('sets correct default values when options are missing', () => {
-      const folder = Folder.get('defaults', {});
-      expect(folder['size']).toBe(500);
-      expect(folder['trim']).toBe(10);
-      expect(folder['timeout']).toBe(60_000);
+      const dir = folder('defaults', {});
+      expect(dir['size']).toBe(500);
+      expect(dir['trim']).toBe(10);
+      expect(dir['timeout']).toBe(60_000);
     });
 
     test('handles null options', () => {
-      const folder = Folder.get('null-opts', null as any);
-      expect(folder['size']).toBe(500);
-      expect(folder['trim']).toBe(10);
-      expect(folder['timeout']).toBe(60_000);
+      const dir = folder('null-opts', null as any);
+      expect(dir['size']).toBe(500);
+      expect(dir['trim']).toBe(10);
+      expect(dir['timeout']).toBe(60_000);
     });
 
     test('handles invalid types for each option', () => {
-      const folder = Folder.get('invalids', {
+      const dir = folder('invalids', {
         size: 'large' as any,
         trim: {} as any,
         timeout: -5 as any,
       });
 
-      expect(folder['size']).toBe(500); // default
-      expect(folder['trim']).toBe(10); // default
-      expect(folder['timeout']).toBe(60_000); // default
+      expect(dir['size']).toBe(500); // default
+      expect(dir['trim']).toBe(10); // default
+      expect(dir['timeout']).toBe(60_000); // default
     });
 
     test('accepts valid custom values for all options', () => {
-      const folder = Folder.get('custom', {
+      const dir = folder('custom', {
         size: 500,
         trim: 50,
         timeout: 120,
       });
 
-      expect(folder['size']).toBe(500);
-      expect(folder['trim']).toBe(50);
-      expect(folder['timeout']).toBe(120_000);
+      expect(dir['size']).toBe(500);
+      expect(dir['trim']).toBe(50);
+      expect(dir['timeout']).toBe(120_000);
     });
 
     test('ignores trim > 100 or <= 0 and falls back to 10', () => {
-      const over = Folder.get('trim-high', { trim: 999 });
+      const over = folder('trim-high', { trim: 999 });
       expect(over['trim']).toBe(10);
 
-      const zero = Folder.get('trim-zero', { trim: 0 });
+      const zero = folder('trim-zero', { trim: 0 });
       expect(zero['trim']).toBe(10);
 
-      const neg = Folder.get('trim-neg', { trim: -20 });
+      const neg = folder('trim-neg', { trim: -20 });
       expect(neg['trim']).toBe(10);
     });
 
     test('ignores size <= 0 and falls back to 500', () => {
-      const folder = Folder.get('size-zero', { size: 0 });
-      expect(folder['size']).toBe(500);
+      const dir = folder('size-zero', { size: 0 });
+      expect(dir['size']).toBe(500);
     });
 
     test('uses 60s as fallback timeout if invalid', () => {
-      const folder = Folder.get('bad-timeout', { timeout: NaN });
-      expect(folder['timeout']).toBe(60_000);
+      const dir = folder('bad-timeout', { timeout: NaN });
+      expect(dir['timeout']).toBe(60_000);
     });
 
     test('uses 60s timeout when set to 0', () => {
-      const folder = Folder.get('zero-timeout', { timeout: 0 });
-      expect(folder['timeout']).toBe(60_000);
+      const dir = folder('zero-timeout', { timeout: 0 });
+      expect(dir['timeout']).toBe(60_000);
     });
 
     test('defaults to "__default__" name if key is not string', () => {
-      const folder = Folder.get({} as any);
-      expect(folder['name']).toBe('__default__');
-    });
-  });
-
-  describe('.delete()', () => {
-    test('deletes folder and stops cleaner', async () => {
-      const folder = Folder.get('to-delete');
-      const stop = jest.spyOn(folder as any, 'stopCleaning');
-      await Folder.delete('to-delete');
-      expect(stop).toHaveBeenCalled();
-      expect(Folder['folders'].has('to-delete')).toBe(false);
+      const dir = folder({} as any);
+      expect(dir['name']).toBe('__default__');
     });
 
-    test('does nothing if key not found', async () => {
-      await expect(Folder.delete('missing')).resolves.toBeUndefined();
+    test('does not start cleaner interval', () => {
+      const spy = jest.spyOn(global, 'setInterval');
+      const store = folder('no-cleaner', { timeout: false });
+      expect(spy).not.toHaveBeenCalled();
+      expect(store['cleaner']).toBeNull();
+      spy.mockRestore();
     });
   });
 
   describe('join()', () => {
     test('sanitizes key and generates safe path', () => {
-      const folder = Folder.get('safe');
-      const result = folder.join('../../..///weird$key');
+      const dir = folder('safe');
+      const result = dir.join('../../..///weird$key');
       expect(result).toMatch(/weird-key\.json$/);
     });
 
     test('removes leading dots from key', () => {
-      const folder = Folder.get('safe');
-      const result = folder.join('...hidden.file');
+      const dir = folder('safe');
+      const result = dir.join('...hidden.file');
       expect(result).toMatch(/hidden\.file\.json$/);
     });
 
     test('limits key length to 100 characters', () => {
-      const folder = Folder.get('safe');
+      const dir = folder('safe');
       const longKey = 'x'.repeat(200);
-      const result = folder.join(longKey);
+      const result = dir.join(longKey);
       const base = path.basename(result);
       expect(base.length).toBeLessThanOrEqual(105); // 100x + ".json"
       expect(base).toMatch(/^x{100}\.json$/);
     });
 
     test('replaces all unsafe characters with hyphens', () => {
-      const folder = Folder.get('safe');
-      const result = folder.join('!@#$%^&*()=+[]{}<>/\\|;:\'",?');
+      const dir = folder('safe');
+      const result = dir.join('!@#$%^&*()=+[]{}<>/\\|;:\'",?');
       expect(path.basename(result)).toMatch(/^[a-zA-Z0-9._-]+\.json$/);
     });
 
     test('handles non-string key input (number)', () => {
-      const folder = Folder.get('safe');
-      const result = folder.join(12345 as any);
+      const dir = folder('safe');
+      const result = dir.join(12345 as any);
       expect(result).toMatch(/12345\.json$/);
     });
 
     test('handles non-string key input (null)', () => {
-      const folder = Folder.get('safe');
-      const result = folder.join(null as any);
+      const dir = folder('safe');
+      const result = dir.join(null as any);
       expect(result).toMatch(/null\.json$/);
     });
 
     test('handles non-string key input (object)', () => {
-      const folder = Folder.get('safe');
-      const result = folder.join({ foo: 'bar' } as any);
+      const dir = folder('safe');
+      const result = dir.join({ foo: 'bar' } as any);
       expect(path.basename(result)).toMatch(/^[a-zA-Z0-9._-]+\.json$/);
     });
   });
 
   describe('get()', () => {
     test('returns fallback on non-string key', async () => {
-      const folder = Folder.get('get');
-      const value = await folder.get(123 as any, 'fallback');
+      const dir = folder('get');
+      const value = await dir.get(123 as any, 'fallback');
       expect(value).toBe('fallback');
     });
 
     test('returns fallback if file does not exist', async () => {
-      const folder = Folder.get('get');
-      const value = await folder.get('not-found', 'fallback');
+      const dir = folder('get');
+      const value = await dir.get('not-found', 'fallback');
       expect(value).toBe('fallback');
     });
 
     test('returns fallback if JSON is invalid or corrupted', async () => {
-      const folder = Folder.get('get');
-      const file = folder.join('broken');
+      const dir = folder('get');
+      const file = dir.join('broken');
       await fs.mkdir(path.dirname(file), { recursive: true });
       await fs.writeFile(file, '{ not: json }');
-      const val = await folder.get('broken', 'fallback');
+      const val = await dir.get('broken', 'fallback');
       expect(val).toBe('fallback');
     });
 
     test('returns data if not expired', async () => {
-      const folder = Folder.get('get');
-      await folder.set('key', { name: 'value' }, 60);
-      const result = await folder.get('key', 'fallback');
+      const dir = folder('get');
+      await dir.set('key', { name: 'value' }, 60);
+      const result = await dir.get('key', 'fallback');
       expect(result).toEqual({ name: 'value' });
     });
 
     test('returns fallback if expired', async () => {
-      const folder = Folder.get('get');
+      const dir = folder('get');
 
-      await folder.set('key', 'expired', 60); // valid for 60s
+      await dir.set('key', 'expired', 60); // valid for 60s
 
       // simulate expiration by modifying meta
-      const meta = folder['meta'].get('key') as any;
+      const meta = dir['meta'].get('key') as any;
       meta.expiresAt = Date.now() - 1;
 
       // trigger cleanup
-      jest.advanceTimersByTime(folder['timeout']);
+      jest.advanceTimersByTime(dir['timeout']);
 
-      const result = await folder.get('key', 'fallback');
+      const result = await dir.get('key', 'fallback');
       expect(result).toBe('fallback');
     });
 
     test('returns fallback if addedAt or expiresAt are invalid (recovery fails)', async () => {
-      const folder = Folder.get('meta-recover-invalid');
-      await fs.mkdir(folder.path, { recursive: true });
+      const dir = folder('meta-recover-invalid');
+      await fs.mkdir(dir.path, { recursive: true });
 
-      const file = folder.join('bad-meta');
+      const file = dir.join('bad-meta');
       const invalidMeta = {
         data: 'bad',
         addedAt: 'not-a-number',
@@ -226,7 +220,7 @@ describe('Folder', () => {
       await fs.writeFile(file, JSON.stringify(invalidMeta));
 
       // Metadata not preloaded — triggers recovery
-      const result = await folder.get('bad-meta');
+      const result = await dir.get('bad-meta');
       const exists = await fs
         .access(file)
         .then(() => true)
@@ -237,11 +231,11 @@ describe('Folder', () => {
     });
 
     test('recovers valid metadata and returns cached value', async () => {
-      const folder = Folder.get('meta-recover-valid');
-      await fs.mkdir(folder.path, { recursive: true });
+      const dir = folder('meta-recover-valid');
+      await fs.mkdir(dir.path, { recursive: true });
 
       const now = Date.now();
-      const file = folder.join('recovered');
+      const file = dir.join('recovered');
       const cache = {
         data: { name: 'restored' },
         addedAt: now - 1000,
@@ -250,10 +244,10 @@ describe('Folder', () => {
       await fs.writeFile(file, JSON.stringify(cache));
 
       // empty metadata map (recovery will run)
-      folder['meta'].clear();
+      dir['meta'].clear();
 
-      const result = await folder.get('recovered', 'fallback');
-      const meta = folder['meta'].get('recovered');
+      const result = await dir.get('recovered', 'fallback');
+      const meta = dir['meta'].get('recovered');
 
       expect(result).toEqual({ name: 'restored' });
       expect(meta).toMatchObject({
@@ -266,10 +260,10 @@ describe('Folder', () => {
     });
 
     test('recovers metadata and deletes file if expired', async () => {
-      const folder = Folder.get('meta-recover-expired');
-      await fs.mkdir(folder.path, { recursive: true });
+      const dir = folder('meta-recover-expired');
+      await fs.mkdir(dir.path, { recursive: true });
 
-      const file = folder.join('expired');
+      const file = dir.join('expired');
       const now = Date.now();
       const cache = {
         data: 'should-not-return',
@@ -278,9 +272,9 @@ describe('Folder', () => {
       };
       await fs.writeFile(file, JSON.stringify(cache));
 
-      folder['meta'].clear(); // force recovery
+      dir['meta'].clear(); // force recovery
 
-      const result = await folder.get('expired', 'fallback');
+      const result = await dir.get('expired', 'fallback');
 
       const exists = await fs
         .access(file)
@@ -288,18 +282,18 @@ describe('Folder', () => {
         .catch(() => false);
 
       expect(result).toBe('fallback');
-      expect(folder['meta'].has('expired')).toBe(false);
+      expect(dir['meta'].has('expired')).toBe(false);
       expect(exists).toBe(false); // file should be deleted
     });
 
     test('recovers multiple cache files and preserves only valid ones', async () => {
-      const folder = Folder.get('meta-recover-multi');
+      const dir = folder('meta-recover-multi');
       const now = Date.now();
 
-      await fs.mkdir(folder.path, { recursive: true });
-      const validFile = folder.join('valid');
-      const expiredFile = folder.join('expired');
-      const invalidFile = folder.join('invalid');
+      await fs.mkdir(dir.path, { recursive: true });
+      const validFile = dir.join('valid');
+      const expiredFile = dir.join('expired');
+      const invalidFile = dir.join('invalid');
 
       await fs.writeFile(
         validFile,
@@ -315,11 +309,11 @@ describe('Folder', () => {
       );
 
       // clear meta
-      folder['meta'].clear();
+      dir['meta'].clear();
 
-      const valid = await folder.get('valid', 'fallback');
-      const expired = await folder.get('expired', 'fallback');
-      const invalid = await folder.get('invalid', 'fallback');
+      const valid = await dir.get('valid', 'fallback');
+      const expired = await dir.get('expired', 'fallback');
+      const invalid = await dir.get('invalid', 'fallback');
 
       const [validExists, expiredExists, invalidExists] = await Promise.all([
         fs
@@ -344,16 +338,16 @@ describe('Folder', () => {
       expect(expiredExists).toBe(false); // removed
       expect(invalidExists).toBe(false); // removed
 
-      expect(folder['meta'].has('valid')).toBe(true); // recovred
-      expect(folder['meta'].has('expired')).toBe(false);
-      expect(folder['meta'].has('invalid')).toBe(false);
+      expect(dir['meta'].has('valid')).toBe(true); // recovred
+      expect(dir['meta'].has('expired')).toBe(false);
+      expect(dir['meta'].has('invalid')).toBe(false);
     });
 
     test('recovers && returns cached value when expiresAt is null (forever cache)', async () => {
-      const folder = Folder.get('get-forever');
-      await fs.mkdir(folder.path, { recursive: true });
+      const dir = folder('get-forever');
+      await fs.mkdir(dir.path, { recursive: true });
 
-      const file = folder.join('forever');
+      const file = dir.join('forever');
       const cache = {
         data: 'forever',
         addedAt: Date.now(),
@@ -361,10 +355,10 @@ describe('Folder', () => {
       };
       await fs.writeFile(file, JSON.stringify(cache));
 
-      folder['meta'].clear(); // Force metadata recovery
+      dir['meta'].clear(); // Force metadata recovery
 
-      const result = await folder.get('forever', 'fallback');
-      const meta = folder['meta'].get('forever');
+      const result = await dir.get('forever', 'fallback');
+      const meta = dir['meta'].get('forever');
 
       expect(result).toBe('forever');
       expect(meta).toBeDefined();
@@ -372,30 +366,30 @@ describe('Folder', () => {
     });
 
     test('deletes metadata entry if expired and already loaded in meta', async () => {
-      const folder = Folder.get('get-meta-delete');
-      await folder.set('will-expire', 'bye', 1); // short-lived cache
+      const dir = folder('get-meta-delete');
+      await dir.set('will-expire', 'bye', 1); // short-lived cache
 
       // Let it expire
-      const meta = folder['meta'].get('will-expire')!;
+      const meta = dir['meta'].get('will-expire')!;
       meta.expiresAt = Date.now() - 1000;
 
       // Call `get` — this triggers: return fallback + fs.rm + meta.delete
-      const result = await folder.get('will-expire', 'fallback');
+      const result = await dir.get('will-expire', 'fallback');
 
       expect(result).toBe('fallback');
-      expect(folder['meta'].has('will-expire')).toBe(false);
+      expect(dir['meta'].has('will-expire')).toBe(false);
     });
   });
 
   describe('set()', () => {
     test('creates cache file with correct structure and metadata', async () => {
-      const folder = Folder.get('set-basic');
+      const dir = folder('set-basic');
       const key = 'user:data';
       const data = { id: 123, name: 'Alice' };
 
-      await folder.set(key, data, 3600);
+      await dir.set(key, data, 3600);
 
-      const file = folder.join(key);
+      const file = dir.join(key);
       const contents = await fs.readFile(file, 'utf-8');
       const parsed = JSON.parse(contents);
       const expiresAt = Date.now() + 3_600 * 1_000;
@@ -405,7 +399,7 @@ describe('Folder', () => {
       expect(parsed.addedAt).toBe(addedAt);
       expect(parsed.expiresAt).toBe(expiresAt);
 
-      const meta = folder['meta'].get('user:data');
+      const meta = dir['meta'].get('user:data');
       expect(meta).toMatchObject({
         expiresAt,
         addedAt,
@@ -416,43 +410,43 @@ describe('Folder', () => {
     });
 
     test('stores forever when no ttl is defined', async () => {
-      const folder = Folder.get('set-null-ttl');
+      const dir = folder('set-null-ttl');
       const key = 'forever';
       const data = { message: 'immortal' };
 
-      await folder.set(key, data);
+      await dir.set(key, data);
 
-      const contents = await fs.readFile(folder.join(key), 'utf-8');
+      const contents = await fs.readFile(dir.join(key), 'utf-8');
       const parsed = JSON.parse(contents);
 
       expect(parsed.expiresAt).toBe(null);
-      const meta = folder['meta'].get('forever');
+      const meta = dir['meta'].get('forever');
       expect(meta?.expiresAt).toBe(null);
     });
 
     test('automatically creates cache directory if missing', async () => {
-      const folder = Folder.get('set-mkdir');
+      const dir = folder('set-mkdir');
       const key = 'auto-dir';
       const data = 'created';
 
       // Simulate missing directory
-      await fs.rm(folder.path, { recursive: true, force: true });
-      await folder.set(key, data, 60);
+      await fs.rm(dir.path, { recursive: true, force: true });
+      await dir.set(key, data, 60);
 
-      const contents = await fs.readFile(folder.join(key), 'utf-8');
+      const contents = await fs.readFile(dir.join(key), 'utf-8');
       const parsed = JSON.parse(contents);
 
       expect(parsed.data).toBe('created');
     });
 
     test('does not write if meta.size exceeds limit', async () => {
-      const folder = Folder.get('set-limit', { size: 1 }); // limit to 1 item
+      const dir = folder('set-limit', { size: 1 }); // limit to 1 item
       const key1 = 'one';
       const key2 = 'two';
 
-      await folder.set(key1, 1, 60);
-      const cleanSpy = jest.spyOn(folder as any, 'cleanSpace');
-      await folder.set(key2, 2, 60);
+      await dir.set(key1, 1, 60);
+      const cleanSpy = jest.spyOn(dir as any, 'cleanSpace');
+      await dir.set(key2, 2, 60);
 
       expect(cleanSpy).toHaveBeenCalled();
     });
@@ -460,99 +454,102 @@ describe('Folder', () => {
 
   describe('delete()', () => {
     test('removes metadata and deletes the cache file', async () => {
-      const folder = Folder.get('delete-test');
-      await folder.set('key', 'value');
-      expect(folder['meta'].has('key')).toBe(true);
+      const dir = folder('delete-test');
+      await dir.set('key', 'value');
+      expect(dir['meta'].has('key')).toBe(true);
 
-      await folder.delete('key');
+      await dir.delete('key');
 
-      expect(folder['meta'].has('key')).toBe(false);
+      expect(dir['meta'].has('key')).toBe(false);
 
       // The file should be deleted
-      await expect(fs.access(folder.join('key'))).rejects.toThrow();
+      await expect(fs.access(dir.join('key'))).rejects.toThrow();
     });
 
     test('does not throw if file does not exist', async () => {
-      const folder = Folder.get('delete-test');
+      const dir = folder('delete-test');
 
       // Should not throw even if file is missing
-      await expect(folder.delete('nonexistent')).resolves.toBeUndefined();
+      await expect(dir.delete('nonexistent')).resolves.toBeUndefined();
     });
 
     test('does not throw if key is invalid', async () => {
-      const folder = Folder.get('delete-test');
+      const dir = folder('delete-test');
 
       // Should not throw even if file is missing
-      await expect(folder.delete(null as any)).resolves.toBeUndefined();
+      await expect(dir.delete(null as any)).resolves.toBeUndefined();
     });
   });
 
   describe('clear()', () => {
-    test('clears metadata and deletes all cached files for this folder', async () => {
-      const folder = Folder.get('clear-test');
-      await folder.set('key1', 'value1');
-      await folder.set('key2', 'value2');
+    test('clears metadata and deletes all cached files for this dir', async () => {
+      const dir = folder('clear-test');
+      await dir.set('key1', 'value1');
+      await dir.set('key2', 'value2');
 
-      expect(folder['meta'].size).toBe(2);
+      expect(dir['meta'].size).toBe(2);
 
-      // Spy on Folder.delete static method
-      const deleteSpy = jest.spyOn(Folder, 'delete');
-
-      await folder.clear();
-
-      expect(deleteSpy).toHaveBeenCalledWith(folder['name']);
+      await dir.clear();
 
       // meta cleaned
-      expect(folder['meta'].size).toBe(0);
+      expect(dir['meta'].size).toBe(0);
 
-      // folder removed
-      await expect(fs.access(folder.path)).rejects.toThrow();
+      // dir removed
+      await expect(fs.access(dir.path)).rejects.toThrow();
 
       // instance is dereferenced
       expect(Folder.folders.has('clear-test')).toBeFalsy();
+    });
+
+    test('deletes dir and stops cleaner', async () => {
+      const dir = folder('to-delete');
+      const stop = jest.spyOn(dir as any, 'stopCleaning');
+      await dir.clear();
+      expect(stop).toHaveBeenCalled();
+      expect(Folder['folders'].has('to-delete')).toBe(false);
     });
   });
 
   describe('startCleaning()', () => {
     test('starts interval cleaner if not running', () => {
-      const folder = Folder.get('cleaning-test');
-      folder['cleaner'] = null;
-      folder['startCleaning']();
-      expect(folder['cleaner']).not.toBeNull();
+      const dir = folder('cleaning-test');
+      dir['cleaner'] = null;
+      dir['startCleaning']();
+      expect(dir['cleaner']).not.toBeNull();
     });
 
     test('does nothing if cleaner is already running', () => {
-      const folder = Folder.get('cleaning-test');
-      const oldCleaner = folder['cleaner'];
-      folder['startCleaning']();
-      expect(folder['cleaner']).toBe(oldCleaner);
+      const dir = folder('cleaning-test');
+      const oldCleaner = dir['cleaner'];
+      dir['startCleaning']();
+      expect(dir['cleaner']).toBe(oldCleaner);
     });
   });
 
   describe('stopCleaning()', () => {
     test('stops interval cleaner if running', () => {
-      const folder = Folder.get('cleaning-test');
+      const dir = folder('cleaning-test');
       const clearSpy = jest.spyOn(global, 'clearInterval');
-      const cleaner = folder['cleaner'];
-      folder['stopCleaning']();
+      const cleaner = dir['cleaner'];
+      dir['stopCleaning']();
       expect(clearSpy).toHaveBeenCalledWith(cleaner);
-      expect(folder['cleaner']).toBeNull();
+      expect(dir['cleaner']).toBeNull();
     });
 
     test('does nothing if cleaner is not running', () => {
-      const folder = Folder.get('cleaning-test');
-      folder['cleaner'] = null;
+      const dir = folder('cleaning-test');
+      dir['cleaner'] = null;
       const clearSpy = jest.spyOn(global, 'clearInterval');
-      folder['stopCleaning']();
+      dir['stopCleaning']();
       expect(clearSpy).not.toHaveBeenCalled();
-      expect(folder['cleaner']).toBeNull();
+      expect(dir['cleaner']).toBeNull();
     });
   });
 
   describe('cleanSpace()', () => {
     test('deletes least-used entries based on trim percentage', async () => {
-      const folder = Folder.get('clean-space-test');
-      folder['meta'].clear();
+      const dir = folder('clean-space-test');
+      dir['meta'].clear();
 
       // Setup multiple entries with different usage counts and addedAt timestamps
       const now = Date.now();
@@ -565,10 +562,10 @@ describe('Folder', () => {
       ];
 
       // Create dummy files and meta entries
-      await fs.mkdir(folder.path, { recursive: true });
+      await fs.mkdir(dir.path, { recursive: true });
 
       for (const entry of filesToCreate) {
-        const filePath = folder.join(entry.key);
+        const filePath = dir.join(entry.key);
 
         await fs.writeFile(
           filePath,
@@ -579,7 +576,7 @@ describe('Folder', () => {
           })
         );
 
-        folder['meta'].set(entry.key, {
+        dir['meta'].set(entry.key, {
           key: entry.key,
           path: filePath,
           used: entry.used,
@@ -589,32 +586,32 @@ describe('Folder', () => {
       }
 
       // Set trim to 40% => will delete 2 files (floor(5 * 40 / 100) = 2)
-      folder['trim'] = 40;
+      dir['trim'] = 40;
 
-      await folder['cleanSpace']();
+      await dir['cleanSpace']();
 
       // Expect only 2 least-used entries deleted: 'd' (used=1), 'b' (used=2)
-      expect(folder['meta'].has('d')).toBe(false);
-      expect(folder['meta'].has('b')).toBe(false);
+      expect(dir['meta'].has('d')).toBe(false);
+      expect(dir['meta'].has('b')).toBe(false);
 
       // Others remain
-      expect(folder['meta'].has('a')).toBe(true);
-      expect(folder['meta'].has('c')).toBe(true);
-      expect(folder['meta'].has('e')).toBe(true);
+      expect(dir['meta'].has('a')).toBe(true);
+      expect(dir['meta'].has('c')).toBe(true);
+      expect(dir['meta'].has('e')).toBe(true);
 
       // Files deleted on disk
-      await expect(fs.access(folder.join('d'))).rejects.toThrow();
-      await expect(fs.access(folder.join('b'))).rejects.toThrow();
+      await expect(fs.access(dir.join('d'))).rejects.toThrow();
+      await expect(fs.access(dir.join('b'))).rejects.toThrow();
 
       // Files remaining on disk
-      await expect(fs.access(folder.join('a'))).resolves.toBeUndefined();
-      await expect(fs.access(folder.join('c'))).resolves.toBeUndefined();
-      await expect(fs.access(folder.join('e'))).resolves.toBeUndefined();
+      await expect(fs.access(dir.join('a'))).resolves.toBeUndefined();
+      await expect(fs.access(dir.join('c'))).resolves.toBeUndefined();
+      await expect(fs.access(dir.join('e'))).resolves.toBeUndefined();
     });
 
     test('stops deleting after reaching target size', async () => {
-      const folder = Folder.get('clean-space-limit');
-      folder['meta'].clear();
+      const dir = folder('clean-space-limit');
+      dir['meta'].clear();
 
       // Setup 3 entries
       const now = Date.now();
@@ -624,10 +621,10 @@ describe('Folder', () => {
         { key: 'z', used: 3, addedAt: now - 3000 },
       ];
 
-      await fs.mkdir(folder.path, { recursive: true });
+      await fs.mkdir(dir.path, { recursive: true });
 
       for (const entry of filesToCreate) {
-        const filePath = folder.join(entry.key);
+        const filePath = dir.join(entry.key);
         await fs.writeFile(
           filePath,
           JSON.stringify({
@@ -636,7 +633,7 @@ describe('Folder', () => {
             expiresAt: entry.addedAt + 100000,
           })
         );
-        folder['meta'].set(entry.key, {
+        dir['meta'].set(entry.key, {
           key: entry.key,
           path: filePath,
           used: entry.used,
@@ -645,14 +642,14 @@ describe('Folder', () => {
         });
       }
 
-      folder['trim'] = 33; // floor(3 * 33 / 100) = 0 (because floor(0.99) = 0)
-      await folder['cleanSpace']();
-      expect(folder['meta'].size).toBe(3); // no deletion because size = 0
+      dir['trim'] = 33; // floor(3 * 33 / 100) = 0 (because floor(0.99) = 0)
+      await dir['cleanSpace']();
+      expect(dir['meta'].size).toBe(3); // no deletion because size = 0
 
-      folder['trim'] = 34; // floor(3 * 34 / 100) = 1
-      await folder['cleanSpace']();
-      expect(folder['meta'].size).toBe(2);
-      expect(folder['meta'].has('x')).toBe(false); // least used removed
+      dir['trim'] = 34; // floor(3 * 34 / 100) = 1
+      await dir['cleanSpace']();
+      expect(dir['meta'].size).toBe(2);
+      expect(dir['meta'].has('x')).toBe(false); // least used removed
     });
   });
 });
