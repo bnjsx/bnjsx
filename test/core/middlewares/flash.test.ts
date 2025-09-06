@@ -15,7 +15,9 @@ describe('flash middleware', () => {
       [FLASH_SET_KEY]: undefined,
     };
 
-    res = { clearCookie: jest.fn() };
+    const forget = jest.fn();
+
+    res = { cookie: jest.fn().mockReturnValue({ forget }) };
   });
 
   it('should parse valid flash cookie and store in req[FLASH_GET_KEY]', async () => {
@@ -25,7 +27,7 @@ describe('flash middleware', () => {
 
     expect(req[FLASH_GET_KEY]).toEqual(['msg1', 'msg2']);
     expect(req[FLASH_SET_KEY]).toEqual([]);
-    expect(res.clearCookie).toHaveBeenCalledWith('flash', '/');
+    expect(res.cookie().forget).toHaveBeenCalledWith('flash');
   });
 
   it('should handle invalid JSON gracefully', async () => {
@@ -35,7 +37,7 @@ describe('flash middleware', () => {
 
     expect(req[FLASH_GET_KEY]).toEqual([]);
     expect(req[FLASH_SET_KEY]).toEqual([]);
-    expect(res.clearCookie).toHaveBeenCalledWith('flash', '/');
+    expect(res.cookie().forget).not.toHaveBeenCalledWith('flash');
   });
 
   it('should handle missing flash cookie', async () => {
@@ -45,7 +47,7 @@ describe('flash middleware', () => {
 
     expect(req[FLASH_GET_KEY]).toEqual([]);
     expect(req[FLASH_SET_KEY]).toEqual([]);
-    expect(res.clearCookie).toHaveBeenCalledWith('flash', '/');
+    expect(res.cookie().forget).not.toHaveBeenCalledWith('flash');
   });
 
   it('should ignore non-array flash data', async () => {
@@ -55,6 +57,6 @@ describe('flash middleware', () => {
 
     expect(req[FLASH_GET_KEY]).toEqual([]);
     expect(req[FLASH_SET_KEY]).toEqual([]);
-    expect(res.clearCookie).toHaveBeenCalledWith('flash', '/');
+    expect(res.cookie().forget).not.toHaveBeenCalledWith('flash');
   });
 });

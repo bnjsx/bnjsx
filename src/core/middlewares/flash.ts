@@ -1,3 +1,4 @@
+import { isArr } from '../../helpers';
 import { Request } from '../modules/Request';
 import { Response } from '../modules/Response';
 
@@ -19,7 +20,7 @@ export async function flash(req: Request, res: Response): Promise<void> {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) messages = parsed;
+      if (isArr(parsed)) messages = parsed;
     } catch {
       // Ignore invalid cookie
     }
@@ -32,5 +33,5 @@ export async function flash(req: Request, res: Response): Promise<void> {
   req[FLASH_SET_KEY] = [];
 
   // Clear cookie immediately (one-time use)
-  res.clearCookie('flash', '/');
+  if (messages.length) res.cookie().forget('flash');
 }

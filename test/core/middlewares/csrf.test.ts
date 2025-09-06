@@ -4,6 +4,7 @@ jest.mock('crypto', () => ({
   }),
 }));
 
+import { config } from '../../../src/config';
 import { bot, csrf, csrft } from '../../../src/core';
 import { BadRequestError } from '../../../src/errors';
 
@@ -18,32 +19,55 @@ describe('CSRF Middleware', () => {
       cookies: {},
       headers: {},
     };
+
+    const add = jest.fn();
+    const set = jest.fn();
+    const get = jest.fn().mockReturnValue('header');
+
     res = {
-      cookie: jest.fn(),
+      cookie: jest.fn().mockReturnValue({ add, set, get }),
     };
   });
 
-  it('should generate a CSRF token for GET requests', async () => {
+  it('should generate a CSRF token using default options', async () => {
     req.cookies = undefined;
     req.method = 'GET';
 
     await csrft(req, res);
 
+    expect(res.cookie().get).toHaveBeenCalledWith('csrfToken', 'mock-token', {
+      path: '/',
+      sameSite: 'Strict',
+      priority: 'High',
+      expires: expect.any(String),
+      secure: false,
+      httpOnly: false,
+    });
+
     // Ensure the CSRF token is set in the request
     expect(req.csrfToken).toBe('mock-token');
 
     // Ensure the cookie is set
-    expect(res.cookie).toHaveBeenCalledWith(
-      'csrfToken',
-      'mock-token',
-      expect.objectContaining({
-        expires: expect.any(String),
-        secure: false, // `secure` will be false since the env is 'dev'
-        httpOnly: false,
-        sameSite: 'Strict',
-        priority: 'High',
-      })
-    );
+    expect(res.cookie().add).toHaveBeenCalledWith('header');
+  });
+
+  it('should generate a CSRF token with custom options', async () => {
+    req.cookies = undefined;
+    req.method = 'GET';
+    const options = config().loadSync();
+    options.cookies = {
+      csrfToken: {
+        path: '/custom',
+      },
+    };
+
+    await csrft(req, res);
+
+    expect(res.cookie().get).not.toHaveBeenCalled();
+    expect(res.cookie().add).not.toHaveBeenCalled();
+
+    expect(req.csrfToken).toBe('mock-token');
+    expect(res.cookie().set).toHaveBeenCalledWith('csrfToken', 'mock-token');
   });
 
   it('should set the CSRF token from cookies if present', async () => {

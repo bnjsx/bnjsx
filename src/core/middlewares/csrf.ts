@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import { Request } from '../modules/Request';
 import { Response } from '../modules/Response';
-import { isStr, UTC } from '../../helpers';
+import { isObj, isStr, UTC } from '../../helpers';
 import { config } from '../../config';
 import { BadRequestError } from '../../errors';
 import { Form } from '../modules/Form';
@@ -19,17 +19,25 @@ import { Form } from '../modules/Form';
  */
 export async function csrft(req: Request, res: Response): Promise<void> {
   if (!isStr(req.cookies?.csrfToken)) {
-    req.csrfToken = randomBytes(32).toString('base64url');
+    const options = config().loadSync();
+    const token = randomBytes(32).toString('base64url');
 
-    // @ts-ignore
-    return res.cookie('csrfToken', req.csrfToken, {
-      expires: UTC.future.hour(1),
+    if (options.cookies?.csrfToken) {
+      req.csrfToken = token;
+      return res.cookie().set('csrfToken', token);
+    }
+
+    const cookie = res.cookie().get('csrfToken', token, {
       path: '/',
-      secure: config().loadSync().env === 'pro',
-      httpOnly: false,
       sameSite: 'Strict',
       priority: 'High',
+      expires: UTC.future.hour(12),
+      secure: options.env === 'pro',
+      httpOnly: false,
     });
+
+    req.csrfToken = token;
+    return res.cookie().add(cookie);
   }
 
   req.csrfToken = req.cookies.csrfToken;

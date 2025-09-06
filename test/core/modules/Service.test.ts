@@ -530,12 +530,7 @@ describe('Service', () => {
 
       expect(res.cookie).toHaveBeenCalledWith(
         'flash',
-        JSON.stringify([{ type: 'error', message: 'Something went wrong' }]),
-        expect.objectContaining({
-          path: '/',
-          httpOnly: true,
-          expires: UTC.future.minute(10),
-        })
+        JSON.stringify([{ type: 'error', message: 'Something went wrong' }])
       );
     });
 
@@ -550,8 +545,7 @@ describe('Service', () => {
 
       expect(res.cookie).toHaveBeenCalledWith(
         'flash',
-        JSON.stringify([{ type: 'success', message: 'User created' }]),
-        expect.any(Object)
+        JSON.stringify([{ type: 'success', message: 'User created' }])
       );
     });
 
@@ -574,8 +568,7 @@ describe('Service', () => {
           { type: 'error', message: 'First warning' },
           { type: 'success', message: 'Now saved' },
           { type: 'info', message: 'FYI' },
-        ]),
-        expect.any(Object)
+        ])
       );
     });
 
@@ -587,10 +580,10 @@ describe('Service', () => {
       expect(req[FLASH_SET_KEY]).toEqual([
         { type: 'error', message: 'Init message' },
       ]);
+
       expect(res.cookie).toHaveBeenCalledWith(
         'flash',
-        JSON.stringify([{ type: 'error', message: 'Init message' }]),
-        expect.any(Object)
+        JSON.stringify([{ type: 'error', message: 'Init message' }])
       );
     });
   });

@@ -20,6 +20,7 @@ import {
   UTC,
 } from '../../helpers';
 import { FLASH_GET_KEY, FLASH_SET_KEY } from '../middlewares/flash';
+import { config } from '../../config';
 
 /**
  * Represents options for setting cookies in HTTP responses.
@@ -224,35 +225,23 @@ export interface Response extends ServerResponse {
   html: (page: string) => Promise<void>;
 
   /**
-   * Sets a cookie on the response.
+   * Handle cookies for the current response.
    *
-   * @param name - The name of the cookie.
-   * @param value - The value of the cookie.
-   * @param options - Optional settings for the cookie.
-   * @throws `ResponseError` if `name` or `value` or `options` are invalid.
-   * @throws `ResponseError` if `expires` is not a valid date or string.
-   * @throws `ResponseError` if `sameSite` value is invalid.
-   * @throws `ResponseError` if `sameSite=None` is used without `secure`.
-   * @throws `ResponseError` if `priority` value is invalid.
-   * @returns The current response instance.
+   * Provides a simple API to set, get, and forget cookies
+   * using predefined options.
+   *
+   * @param name Cookie name (optional)
+   * @param value Cookie value (optional)
+   * @returns `Cookie` manager instance for chaining.
    *
    * @example
-   * res.cookie('session', 'abc123', { httpOnly: true, secure: true, maxAge: 3600 });
-   */
-  cookie: (name: string, value: string, options?: CookieOptions) => Response;
-
-  /**
-   * Clears a cookie by name.
+   * // Set a cookie
+   * res.cookie('session', 'abc123');
    *
-   * @param name - The name of the cookie to clear.
-   * @param path - The path of the cookie (defaults to '/').
-   * @param domain - The domain of the cookie (defaults to the request host).
-   * @throws `ResponseError` if `name` is not a string.
-   * @throws `ResponseError` if `path` is provided but not a string.
-   * @throws `ResponseError` if `domain` is provided but not a string.
-   * @returns The current response instance.
+   * // Forget (clear) a cookie
+   * res.cookie().forget('session');
    */
-  clearCookie: (name: string, path?: string, domain?: string) => Response;
+  cookie: (name?: string, value?: string) => Cookie;
 }
 
 /**
@@ -263,9 +252,6 @@ export class ResponseError extends Error {}
 /**
  * The Redirector class provides a clean, chainable API for performing HTTP redirects,
  * optionally including flash messages using cookies.
- *
- * @example
- *   redirect().back().with('Something went wrong', 'error').send();
  */
 export class Redirector {
   private url: string | null = null;
@@ -331,11 +317,7 @@ export class Redirector {
 
     this.req[FLASH_SET_KEY].push({ type, message });
 
-    this.res.cookie('flash', JSON.stringify(this.req[FLASH_SET_KEY]), {
-      path: '/',
-      httpOnly: true,
-      expires: UTC.future.minute(10),
-    });
+    this.res.cookie().set('flash', JSON.stringify(this.req[FLASH_SET_KEY]));
 
     return this;
   }
@@ -358,6 +340,131 @@ export class Redirector {
     this.res.status(code);
 
     await this.res.send();
+  }
+}
+
+/**
+ * Error type for cookie-related operations.
+ */
+export class CookieError extends Error {}
+
+/**
+ * Cookie manager for HTTP responses.
+ * Handles validation, formatting, setting, and clearing cookies.
+ * Keeps track of options per cookie so they can be reused when forgetting.
+ */
+export class Cookie {
+  /**
+   * Create a new Cookie instance bound to a request/response.
+   *
+   * @param req The incoming HTTP request (used if needed for context)
+   * @param res The outgoing HTTP response, where cookies will be set
+   */
+  constructor(private req: Request, private res: Response) {}
+
+  /**
+   * Retrieve cookie options for a given cookie name.
+   *
+   * @param name - The cookie name to look up.
+   * @returns The resolved {@link CookieOptions}.
+   */
+  public options(name: string): CookieOptions {
+    const { cookies, env } = config().loadSync();
+
+    if (!isObj(cookies) || !isObj(cookies[name])) {
+      return {
+        path: '/',
+        sameSite: 'Lax',
+        expires: UTC.future.month(1),
+        secure: env === 'pro',
+        httpOnly: true,
+        priority: 'High',
+      };
+    }
+
+    return cookies[name];
+  }
+
+  /**
+   * Builds a `Set-Cookie` header string.
+   *
+   * @param name Cookie name (must be a string)
+   * @param value Cookie value (encoded automatically)
+   * @param options Cookie options
+   * @returns A properly formatted cookie header
+   */
+  public get(name: string, value: string, options: CookieOptions): string {
+    if (!isStr(name)) throw new CookieError('Invalid cookie name');
+    if (!isStr(value)) throw new CookieError('Invalid cookie value');
+    if (!isObj(options)) throw new CookieError('Invalid cookie options');
+
+    const parts = [`${name}=${encodeURIComponent(value)}`];
+
+    if (isInt(options.maxAge)) parts.push(`Max-Age=${options.maxAge}`);
+    if (isStr(options.domain)) parts.push(`Domain=${options.domain}`);
+    if (isStr(options.path)) parts.push(`Path=${options.path}`);
+
+    if (isStr(options.priority)) parts.push(`Priority=${options.priority}`);
+    if (isStr(options.sameSite)) parts.push(`SameSite=${options.sameSite}`);
+
+    if (isStr(options.expires)) {
+      options.expires = new Date(options.expires);
+    }
+
+    if (isDate(options.expires)) {
+      parts.push(`Expires=${options.expires.toString()}`);
+    }
+
+    if (options.secure) parts.push('Secure');
+    if (options.httpOnly) parts.push('HttpOnly');
+    if (options.partitioned) parts.push('Partitioned');
+
+    return parts.join('; ');
+  }
+
+  /**
+   * Add a cookie header on the HTTP response.
+   *
+   * @param cookie Cookie header string
+   */
+  public add(cookie: string): void {
+    if (!isStr(cookie)) throw new CookieError('Invalid cookie header');
+
+    let cookies = this.res.getHeader('Set-Cookie');
+
+    if (!cookies) cookies = [];
+    if (isStr(cookies)) cookies = [cookies];
+    if (isArr(cookies)) cookies.push(cookie);
+
+    this.res.setHeader('Set-Cookie', cookies);
+  }
+
+  /**
+   * Set a cookie on the HTTP response.
+   *
+   * @param name Cookie name (must be a string)
+   * @param value Cookie value (must be a string)
+   */
+  public set(name: string, value: string): void {
+    if (!isStr(name)) throw new CookieError('Invalid cookie name');
+    this.add(this.get(name, value, this.options(name)));
+  }
+
+  /**
+   * Remove a cookie by name.
+   *
+   * @param name Cookie name to forget (must be a string)
+   */
+  public forget(name: string): void {
+    if (!isStr(name)) throw new ResponseError('Invalid cookie name');
+
+    this.add(
+      this.get(name, '', {
+        ...this.options(name),
+        expires: new Date(0).toString(),
+        maxAge: 0,
+      })
+    );
   }
 }
 
@@ -646,114 +753,10 @@ ServerResponse.prototype.json = function (data: unknown): Promise<void> {
 
 // @ts-ignore
 ServerResponse.prototype.cookie = function (
-  name: string,
-  value: string,
-  options: CookieOptions = {}
-): Response {
-  if (!isStr(name)) {
-    throw new ResponseError('Invalid cookie name');
-  }
-
-  if (!isStr(value)) {
-    throw new ResponseError('Invalid cookie value');
-  }
-
-  if (options && !isObj(options)) {
-    throw new ResponseError('Invalid cookie options');
-  }
-
-  const cookie = [`${name}=${encodeURIComponent(value)}`];
-
-  // Add Max-Age if provided
-  if (options.maxAge) cookie.push(`Max-Age=${options.maxAge}`);
-
-  // Add Domain if provided
-  if (options.domain) cookie.push(`Domain=${options.domain}`);
-
-  // Add Path if provided (defaults to '/')
-  if (options.path) cookie.push(`Path=${options.path}`);
-
-  // Add Secure flag if provided
-  if (options.secure) cookie.push('Secure');
-
-  // Add HttpOnly flag if provided
-  if (options.httpOnly) cookie.push('HttpOnly');
-
-  // Add Partitioned flag if provided
-  if (options.partitioned) cookie.push('Partitioned');
-
-  // Add Expires if provided
-  if (options.expires) {
-    if (!isStr(options.expires) && !isDate(options.expires)) {
-      throw new ResponseError(`Invalid expires value: ${options.expires}`);
-    }
-
-    if (isStr(options.expires)) options.expires = new Date(options.expires);
-    cookie.push(`Expires=${options.expires.toString()}`);
-  }
-
-  // Add SameSite if provided (with validation)
-  if (options.sameSite) {
-    if (!['Strict', 'Lax', 'None'].includes(options.sameSite)) {
-      throw new ResponseError(`Invalid SameSite value: ${options.sameSite}`);
-    }
-
-    // If SameSite is 'None', the Secure flag must also be set
-    if (options.sameSite === 'None' && !options.secure) {
-      throw new ResponseError('SameSite=None requires the Secure flag.');
-    }
-
-    cookie.push(`SameSite=${options.sameSite}`);
-  }
-
-  // Add Priority if provided
-  if (options.priority) {
-    if (!['Low', 'Medium', 'High'].includes(options.priority)) {
-      throw new ResponseError(`Invalid Priority value: ${options.priority}`);
-    }
-
-    cookie.push(`Priority=${options.priority}`);
-  }
-
-  // Set the cookie header (multi-cookie safe)
-  const existing = this.getHeader('Set-Cookie');
-  const current = cookie.join('; ');
-
-  if (existing) {
-    const cookies = isArr(existing) ? existing : [existing];
-    cookies.push(current);
-    this.setHeader('Set-Cookie', cookies);
-  } else {
-    this.setHeader('Set-Cookie', current);
-  }
-
-  return this;
-};
-
-// @ts-ignore
-ServerResponse.prototype.clearCookie = function clearCookie(
-  name: string,
-  path?: string,
-  domain?: string
-) {
-  if (!isStr(name)) {
-    throw new ResponseError('Invalid cookie name');
-  }
-
-  if (!path) path = '/';
-  else if (!isStr(path)) {
-    throw new ResponseError('Invalid cookie path');
-  }
-
-  if (!domain) domain = this.request.host;
-  else if (!isStr(domain)) {
-    throw new ResponseError('Invalid cookie domain');
-  }
-
-  this.setHeader(
-    'Set-Cookie',
-    `${name}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=${path}; Domain=${domain};`
-  );
-
-  return this;
+  name?: string,
+  value?: string
+): Cookie {
+  const cookie = new Cookie(this.request, this);
+  if (isStr(name) && isStr(value)) cookie.set(name, value);
+  return cookie;
 };

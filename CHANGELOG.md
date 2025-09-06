@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@2.0.3 - 2025-09-06**
+
+### Enhanced
+
+- **Completely redesigned cookie management** - Replaced `response.cookie()` and `response.clearCookie()` with a more powerful and flexible Cookie API.
+
+### New Cookie API
+
+- `res.cookie('name', 'value')` - Sets a new cookie (same as before, but now returns Cookie instance)
+- `res.cookie().set('name', 'value')` - Alternative way to set cookies
+- `res.cookie().forget('name')` - Clears a cookie by name
+- `res.cookie().get(name, value, options)` - Builds cookie header string
+- `res.cookie().add(header)` - Adds pre-built cookie header to response
+- `res.cookie().options(name)` - Returns cookie options from config or defaults
+
 ## **Bnjsx@2.0.2 - 2025-09-01**
 
 ### Added
@@ -11,8 +26,7 @@ All notable changes to this project will be documented in this file.
   - `true` (default): executes an extra query to verify connection health before use.
   - `false`: disables connection checking.
 - `Validator.any()` – ensures at least one field is provided. Useful when all fields are optional.
-- `Validator.field(name, display)` and `Validator.file(name, display)` now accept an optional `display` argument to customize field names in error messages.  
-  Example: `Validator.field("username", "Le nom d'utilisateur")` → error messages will use the friendly display name.
+- `Validator.field(name, display)` and `Validator.file(name, display)` now accept an optional `display` argument to customize field names in error messages.
 
 ### Fixed
 

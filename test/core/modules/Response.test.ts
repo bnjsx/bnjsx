@@ -20,6 +20,8 @@ jest.mock('../../../src/core/template/Component', () => ({
 import '../../../src/core/modules/Response';
 import * as fs from 'fs/promises';
 import {
+  Cookie,
+  CookieError,
   FLASH_GET_KEY,
   FLASH_SET_KEY,
   Redirector,
@@ -30,6 +32,7 @@ import { NotFoundError } from '../../../src/errors';
 import { createReadStream, ReadStream } from 'fs';
 import { render } from '../../../src/core';
 import { UTC } from '../../../src/helpers';
+import { config } from '../../../src/config';
 
 describe('Response', () => {
   let res: any;
@@ -41,7 +44,6 @@ describe('Response', () => {
     res.getHeader = jest.fn();
     res.clearHeader = jest.fn();
     res.hasHeader = jest.fn(() => false);
-    res.setCooke;
     // Override writableEnded using defineProperty
     Object.defineProperty(res, 'writableEnded', {
       value: false,
@@ -512,265 +514,22 @@ describe('Response', () => {
     });
   });
 
-  describe('cookie', () => {
-    test('should throw an error for invalid cookie name', () => {
-      expect(() => {
-        res.cookie(123 as any, 'value');
-      }).toThrow('Invalid cookie name');
-    });
-
-    test('should throw an error for invalid cookie value', () => {
-      expect(() => {
-        res.cookie('test', 456 as any);
-      }).toThrow('Invalid cookie value');
-    });
-
-    test('should throw an error for invalid options object', () => {
-      expect(() => {
-        res.cookie('name', 'value', 'invalid' as any);
-      }).toThrow('Invalid cookie options');
-    });
-
-    test('should set a basic cookie', () => {
-      res.cookie('user', 'john');
-
-      expect(res.setHeader).toHaveBeenCalledWith('Set-Cookie', 'user=john');
-    });
-
-    test('should encode the cookie value', () => {
-      res.cookie('token', 'abc def');
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'token=abc%20def'
-      );
-    });
-
-    test('should set cookie with Max-Age', () => {
-      res.cookie('session', 'xyz', { maxAge: 3600 });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'session=xyz; Max-Age=3600'
-      );
-    });
-
-    test('should set cookie with Domain', () => {
-      res.cookie('site', 'example', { domain: 'example.com' });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'site=example; Domain=example.com'
-      );
-    });
-
-    test('should set cookie with Path', () => {
-      res.cookie('page', 'home', { path: '/admin' });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'page=home; Path=/admin'
-      );
-    });
-
-    test('should set Secure flag', () => {
-      res.cookie('auth', 'true', { secure: true });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'auth=true; Secure'
-      );
-    });
-
-    test('should set HttpOnly flag', () => {
-      res.cookie('secret', '123', { httpOnly: true });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'secret=123; HttpOnly'
-      );
-    });
-
-    test('should set Partitioned flag', () => {
-      res.cookie('data', 'info', { partitioned: true });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'data=info; Partitioned'
-      );
-    });
-
-    test('should set Expires with valid Date object', () => {
-      const expires = new Date('2030-01-01T00:00:00Z');
-      res.cookie('expireTest', 'yes', { expires });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        `expireTest=yes; Expires=${expires.toString()}`
-      );
-    });
-
-    test('should set Expires with valid Date string', () => {
-      const expires = '2030-01-01 00:00:00';
-      res.cookie('expireTest', 'yes', { expires });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        `expireTest=yes; Expires=${new Date(expires).toString()}`
-      );
-    });
-
-    test('should throw error for invalid Expires value', () => {
-      expect(() => {
-        res.cookie('expireTest', 'yes', { expires: 123 as any });
-      }).toThrow('Invalid expires value: 123');
-    });
-
-    test('should set SameSite with valid values', () => {
-      res.cookie('samesiteTest', 'value', { sameSite: 'Strict' });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'samesiteTest=value; SameSite=Strict'
-      );
-    });
-
-    test('should throw error for invalid SameSite value', () => {
-      expect(() => {
-        res.cookie('test', 'value', { sameSite: 'Invalid' as any });
-      }).toThrow('Invalid SameSite value: Invalid');
-    });
-
-    test('should throw error if SameSite=None is set without Secure', () => {
-      expect(() => {
-        res.cookie('test', 'value', { sameSite: 'None' });
-      }).toThrow('SameSite=None requires the Secure flag.');
-    });
-
-    test('should set Priority with valid values', () => {
-      res.cookie('priorityTest', 'high', { priority: 'High' });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'priorityTest=high; Priority=High'
-      );
-    });
-
-    test('should throw error for invalid Priority value', () => {
-      expect(() => {
-        res.cookie('test', 'value', { priority: 'Invalid' as any });
-      }).toThrow('Invalid Priority value: Invalid');
-    });
-
-    test('should set multiple cookie options', () => {
-      res.cookie('multi', 'test', {
-        maxAge: 3600,
-        domain: 'example.com',
-        path: '/',
-        secure: true,
-        httpOnly: true,
-        sameSite: 'Lax',
-      });
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'multi=test; Max-Age=3600; Domain=example.com; Path=/; Secure; HttpOnly; SameSite=Lax'
-      );
-    });
-
-    test('should append multiple cookies in Set-Cookie header as array', () => {
-      // First cookie sets header as string
-      res.cookie('first', '1');
-      expect(res.setHeader).toHaveBeenLastCalledWith('Set-Cookie', 'first=1');
-
-      // Mock getHeader to return the last set value (string)
-      (res.getHeader as jest.Mock).mockReturnValue('first=1');
-
-      // Second cookie should convert header to array
-      res.cookie('second', '2');
-      expect(res.setHeader).toHaveBeenLastCalledWith('Set-Cookie', [
-        'first=1',
-        'second=2',
-      ]);
-    });
-
-    test('should add cookies to existing Set-Cookie array header', () => {
-      // Mock getHeader to simulate existing array of cookies
-      (res.getHeader as jest.Mock).mockReturnValue(['first=1']);
-
-      res.cookie('second', '2');
-
-      expect(res.setHeader).toHaveBeenLastCalledWith('Set-Cookie', [
-        'first=1',
-        'second=2',
-      ]);
-    });
-  });
-
-  describe('clearCookie', () => {
-    beforeEach(() => {
-      res.request = { host: 'example.com' }; // Mock request host
-    });
-
-    test('should throw an error for invalid cookie name', () => {
-      expect(() => {
-        res.clearCookie(123 as any);
-      }).toThrow('Invalid cookie name');
-    });
-
-    test('should clear a cookie with default path and domain', () => {
-      res.clearCookie('session');
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'session=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Domain=example.com;'
-      );
-    });
-
-    test('should clear a cookie with a custom path', () => {
-      res.clearCookie('auth', '/admin');
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'auth=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/admin; Domain=example.com;'
-      );
-    });
-
-    test('should throw an error for invalid cookie path', () => {
-      expect(() => {
-        res.clearCookie('session', 123 as any);
-      }).toThrow('Invalid cookie path');
-    });
-
-    test('should clear a cookie with a custom domain', () => {
-      res.clearCookie('user', '/', 'mydomain.com');
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'user=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; Domain=mydomain.com;'
-      );
-    });
-
-    test('should throw an error for invalid cookie domain', () => {
-      expect(() => {
-        res.clearCookie('session', '/', 123 as any);
-      }).toThrow('Invalid cookie domain');
-    });
-
-    test('should clear a cookie with both custom path and domain', () => {
-      res.clearCookie('token', '/secure', 'auth.com');
-
-      expect(res.setHeader).toHaveBeenCalledWith(
-        'Set-Cookie',
-        'token=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/secure; Domain=auth.com;'
-      );
-    });
-  });
-
   describe('redirect', () => {
     test('should return an instance of Redirector', () => {
       const result = res.redirect('/somewhere');
       expect(result).toBeInstanceOf(Redirector);
+    });
+  });
+
+  describe('cookie', () => {
+    test('should return an instance of Cookie', () => {
+      const result = res.cookie();
+      expect(result).toBeInstanceOf(Cookie);
+    });
+
+    test('should set a cookie', () => {
+      const result = res.cookie('name', 'value');
+      expect(result).toBeInstanceOf(Cookie);
     });
   });
 });
@@ -786,8 +545,10 @@ describe('Redirector', () => {
     req.getHeader = (key: string) => req.headers[key.toLowerCase()];
     req[FLASH_SET_KEY] = [];
 
+    const set = jest.fn();
+
     res = {
-      cookie: jest.fn(),
+      cookie: jest.fn(() => ({ set })),
       setHeader: jest.fn(),
       status: jest.fn().mockReturnThis(),
       send: jest.fn().mockResolvedValue(undefined),
@@ -884,14 +645,9 @@ describe('Redirector', () => {
         { type: 'error', message: 'Something went wrong' },
       ]);
 
-      expect(res.cookie).toHaveBeenCalledWith(
+      expect(res.cookie().set).toHaveBeenCalledWith(
         'flash',
-        JSON.stringify([{ type: 'error', message: 'Something went wrong' }]),
-        expect.objectContaining({
-          path: '/',
-          httpOnly: true,
-          expires: UTC.future.minute(10),
-        })
+        JSON.stringify([{ type: 'error', message: 'Something went wrong' }])
       );
     });
 
@@ -904,10 +660,9 @@ describe('Redirector', () => {
         { type: 'success', message: 'User created' },
       ]);
 
-      expect(res.cookie).toHaveBeenCalledWith(
+      expect(res.cookie().set).toHaveBeenCalledWith(
         'flash',
-        JSON.stringify([{ type: 'success', message: 'User created' }]),
-        expect.any(Object)
+        JSON.stringify([{ type: 'success', message: 'User created' }])
       );
     });
 
@@ -924,14 +679,13 @@ describe('Redirector', () => {
         { type: 'info', message: 'FYI' },
       ]);
 
-      expect(res.cookie).toHaveBeenLastCalledWith(
+      expect(res.cookie().set).toHaveBeenLastCalledWith(
         'flash',
         JSON.stringify([
           { type: 'error', message: 'First warning' },
           { type: 'success', message: 'Now saved' },
           { type: 'info', message: 'FYI' },
-        ]),
-        expect.any(Object)
+        ])
       );
     });
 
@@ -943,16 +697,327 @@ describe('Redirector', () => {
       expect(req[FLASH_SET_KEY]).toEqual([
         { type: 'error', message: 'Init message' },
       ]);
-      expect(res.cookie).toHaveBeenCalledWith(
+
+      expect(res.cookie().set).toHaveBeenCalledWith(
         'flash',
-        JSON.stringify([{ type: 'error', message: 'Init message' }]),
-        expect.any(Object)
+        JSON.stringify([{ type: 'error', message: 'Init message' }])
       );
     });
 
     test('should reject invalid arguments', () => {
       expect(() => redirect.with(null as any)).toThrow();
       expect(() => redirect.with('message', 123 as any)).toThrow();
+    });
+  });
+});
+
+describe('Cookie', () => {
+  let req: any;
+  let res: any;
+  let options: any;
+
+  beforeEach(() => {
+    req = {};
+    res = {
+      setHeader: jest.fn(),
+      getHeader: jest.fn().mockReturnValue(undefined),
+    };
+
+    options = config().loadSync();
+    options.env = 'dev';
+    options.cookies = {
+      test: {
+        path: '/test',
+        sameSite: 'Strict' as const,
+        expires: new Date('2030-01-01T00:00:00Z'),
+        secure: true,
+        httpOnly: true,
+        priority: 'High' as const,
+      },
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+  });
+
+  describe('CookieError', () => {
+    test('should be an instance of Error', () => {
+      const error = new CookieError('Test error');
+      expect(error).toBeInstanceOf(Error);
+      expect(error.message).toBe('Test error');
+    });
+  });
+
+  describe('constructor', () => {
+    test('should create a Cookie instance', () => {
+      const cookie = new Cookie(req, res);
+      expect(cookie).toBeInstanceOf(Cookie);
+    });
+  });
+
+  describe('options() method', () => {
+    let cookie: Cookie;
+
+    beforeEach(() => {
+      cookie = new Cookie(req, res);
+    });
+
+    test('should return default values when no cookie config exists', () => {
+      // Mock config to return empty cookies
+      options.cookies = {};
+      options.env = 'dev';
+
+      const result = cookie.options('nonexistent');
+
+      expect(result.path).toBe('/');
+      expect(result.sameSite).toBe('Lax');
+      expect(result.secure).toBe(false); // env is 'dev'
+      expect(result.httpOnly).toBe(true);
+      expect(result.priority).toBe('High');
+      expect(expect.any(result.expires)).toBeTruthy();
+    });
+
+    test('should return configured options when cookie exists', () => {
+      const result = cookie.options('test');
+
+      expect(result.path).toBe('/test');
+      expect(result.sameSite).toBe('Strict');
+      expect(result.secure).toBe(true);
+      expect(result.httpOnly).toBe(true);
+      expect(result.priority).toBe('High');
+      expect(result.expires).toEqual(new Date('2030-01-01T00:00:00Z'));
+    });
+
+    test('should return secure=true in production environment', () => {
+      options.cookies = {};
+      options.env = 'pro';
+
+      const result = cookie.options('any');
+      expect(result.secure).toBe(true);
+    });
+  });
+
+  describe('get() method', () => {
+    let cookie: Cookie;
+
+    beforeEach(() => {
+      cookie = new Cookie(req, res);
+    });
+
+    test('should throw error for invalid cookie name', () => {
+      expect(() => {
+        cookie.get(123 as any, 'value', {});
+      }).toThrow('Invalid cookie name');
+    });
+
+    test('should throw error for invalid cookie value', () => {
+      expect(() => {
+        cookie.get('test', 123 as any, {});
+      }).toThrow('Invalid cookie value');
+    });
+
+    test('should throw error for invalid cookie options', () => {
+      expect(() => {
+        cookie.get('name', 'value', 123 as any);
+      }).toThrow('Invalid cookie options');
+    });
+
+    test('should encode cookie value', () => {
+      const result = cookie.get('test', 'value with spaces', {});
+      expect(result).toContain('test=value%20with%20spaces');
+    });
+
+    test('should include maxAge in cookie string', () => {
+      const result = cookie.get('test', 'value', { maxAge: 3600 });
+      expect(result).toContain('Max-Age=3600');
+    });
+
+    test('should include domain in cookie string', () => {
+      const result = cookie.get('test', 'value', { domain: 'example.com' });
+      expect(result).toContain('Domain=example.com');
+    });
+
+    test('should include path in cookie string', () => {
+      const result = cookie.get('test', 'value', { path: '/admin' });
+      expect(result).toContain('Path=/admin');
+    });
+
+    test('should include secure flag in cookie string', () => {
+      const result = cookie.get('test', 'value', { secure: true });
+      expect(result).toContain('Secure');
+    });
+
+    test('should include httpOnly flag in cookie string', () => {
+      const result = cookie.get('test', 'value', { httpOnly: true });
+      expect(result).toContain('HttpOnly');
+    });
+
+    test('should include partitioned flag in cookie string', () => {
+      const result = cookie.get('test', 'value', { partitioned: true });
+      expect(result).toContain('Partitioned');
+    });
+
+    test('should include priority in cookie string', () => {
+      const result = cookie.get('test', 'value', { priority: 'High' });
+      expect(result).toContain('Priority=High');
+    });
+
+    test('should include expires in cookie string', () => {
+      const expires = new Date('2030-01-01T00:00:00Z');
+      const result = cookie.get('test', 'value', { expires });
+      expect(result).toContain(`Expires=${expires.toString()}`);
+    });
+
+    test('should include sameSite in cookie string', () => {
+      const result = cookie.get('test', 'value', { sameSite: 'Strict' });
+      expect(result).toContain('SameSite=Strict');
+    });
+
+    test('should create complete cookie string with multiple options', () => {
+      const expires = new Date('2030-01-01T00:00:00Z');
+      const result = cookie.get('complete', 'value', {
+        maxAge: 3600,
+        domain: 'example.com',
+        path: '/admin',
+        secure: true,
+        httpOnly: true,
+        partitioned: true,
+        priority: 'High',
+        expires,
+        sameSite: 'Strict',
+      });
+
+      expect(result).toContain('complete=value');
+      expect(result).toContain('Max-Age=3600');
+      expect(result).toContain('Domain=example.com');
+      expect(result).toContain('Path=/admin');
+      expect(result).toContain('Priority=High');
+      expect(result).toContain('SameSite=Strict');
+      expect(result).toContain('Expires=');
+      expect(result).toContain('Secure');
+      expect(result).toContain('HttpOnly');
+      expect(result).toContain('Partitioned');
+    });
+  });
+
+  describe('add() method', () => {
+    let cookie: Cookie;
+
+    beforeEach(() => {
+      cookie = new Cookie(req, res);
+      jest.clearAllMocks();
+    });
+
+    test('should throw error for invalid cookie header', () => {
+      expect(() => {
+        cookie.add(123 as any);
+      }).toThrow('Invalid cookie header');
+    });
+
+    test('should create new array when no existing header', () => {
+      cookie.add('test=cookie');
+
+      expect(res.setHeader).toHaveBeenCalledWith('Set-Cookie', ['test=cookie']);
+    });
+
+    test('should append to existing Set-Cookie header array', () => {
+      res.getHeader.mockReturnValue(['existing=cookie']);
+
+      cookie.add('new=cookie');
+
+      expect(res.setHeader).toHaveBeenCalledWith('Set-Cookie', [
+        'existing=cookie',
+        'new=cookie',
+      ]);
+    });
+
+    test('should convert string header to array', () => {
+      res.getHeader.mockReturnValue('existing=cookie');
+
+      cookie.add('new=cookie');
+
+      expect(res.setHeader).toHaveBeenCalledWith('Set-Cookie', [
+        'existing=cookie',
+        'new=cookie',
+      ]);
+    });
+  });
+
+  describe('set() method', () => {
+    let cookie: Cookie;
+
+    beforeEach(() => {
+      cookie = new Cookie(req, res);
+      jest.clearAllMocks();
+    });
+
+    test('should set cookie with options from config', () => {
+      cookie.set('test', 'value');
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        expect.any(Array)
+      );
+
+      const setCookieHeader = (res.setHeader as jest.Mock).mock.calls[0][1][0];
+
+      expect(setCookieHeader).toContain('test=value');
+      expect(setCookieHeader).toContain('Path=/test');
+      expect(setCookieHeader).toContain('SameSite=Strict');
+      expect(setCookieHeader).toContain('Secure');
+      expect(setCookieHeader).toContain('HttpOnly');
+      expect(setCookieHeader).toContain('Priority=High');
+    });
+
+    test('should throw error for invalid cookie name', () => {
+      expect(() => {
+        cookie.set(123 as any, 'value');
+      }).toThrow('Invalid cookie name');
+    });
+  });
+
+  describe('forget() method', () => {
+    let cookie: Cookie;
+
+    beforeEach(() => {
+      cookie = new Cookie(req, res);
+      jest.clearAllMocks();
+    });
+
+    test('should throw error for invalid cookie name', () => {
+      expect(() => {
+        cookie.forget(123 as any);
+      }).toThrow('Invalid cookie name');
+    });
+
+    test('should set cookie with expiration values', () => {
+      cookie.forget('test');
+
+      expect(res.setHeader).toHaveBeenCalledWith(
+        'Set-Cookie',
+        expect.any(Array)
+      );
+
+      const setCookieHeader = (res.setHeader as jest.Mock).mock.calls[0][1][0];
+
+      expect(setCookieHeader).toContain('test=;');
+      expect(setCookieHeader).toContain('Max-Age=0');
+      expect(setCookieHeader).toContain(
+        'Expires=Thu Jan 01 1970 00:00:00 GMT+0000 (GMT)'
+      );
+      expect(setCookieHeader).toContain('Path=/test'); // From config
+    });
+
+    test('should use default options for unknown cookies', () => {
+      cookie.forget('unknown');
+
+      const setCookieHeader = (res.setHeader as jest.Mock).mock.calls[0][1][0];
+
+      expect(setCookieHeader).toContain('unknown=;');
+      expect(setCookieHeader).toContain('Path=/'); // Default path
+      expect(setCookieHeader).toContain('SameSite=Lax'); // Default sameSite
     });
   });
 });

@@ -350,14 +350,8 @@ export class Service extends Router {
     type: 'error' | 'info' | 'success' = 'error'
   ): void {
     if (!this.request[FLASH_SET_KEY]) this.request[FLASH_SET_KEY] = [];
-
     this.request[FLASH_SET_KEY].push({ type, message });
-
-    this.response.cookie('flash', JSON.stringify(this.request[FLASH_SET_KEY]), {
-      path: '/',
-      httpOnly: true,
-      expires: UTC.future.minute(10),
-    });
+    this.response.cookie('flash', JSON.stringify(this.request[FLASH_SET_KEY]));
   }
 
   /**
