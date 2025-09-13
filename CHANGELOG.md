@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@2.0.5 - 2025-09-13**
+
+### Fixed
+
+- Corrected **Content-Type headers** for static assets.
+  - Some files (CSS, JS, fonts) were previously served with incorrect MIME types, causing browsers with strict MIME checking to block them.
+  - Now all static files are served with the proper Content-Type (`text/css`, `application/javascript`, etc.) using `mime-types`.
+
 ## **Bnjsx@2.0.4 - 2025-09-13**
 
 ### New

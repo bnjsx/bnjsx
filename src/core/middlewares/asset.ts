@@ -1,4 +1,4 @@
-import { isAbsolute, normalize, resolve as resolver } from 'path';
+import { extname, isAbsolute, normalize, resolve as resolver } from 'path';
 import { Request } from '../modules/Request';
 import { Response } from '../modules/Response';
 import { config } from '../../config';
@@ -75,7 +75,7 @@ export function asset(req: Request, res: Response): Promise<void> {
         const buffer = 'application/octet-stream';
         const etag = `${stats.mtimeMs}-${stats.size}`;
         const gzp = path.concat('.gz');
-        const type = mime.contentType(path) || buffer;
+        const type = mime.contentType(extname(path)) || buffer;
 
         const matched = req.getHeader('If-None-Match');
         const modified = req.getHeader('If-Modified-Since') as string;

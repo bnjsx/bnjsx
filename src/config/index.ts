@@ -544,6 +544,11 @@ export interface AppOptions {
   mode?: 'web' | 'api';
 
   /**
+   * The application endpoint for production (https://example.com).
+   */
+  base?: string;
+
+  /**
    * The hostname or IP address the server should bind to.
    */
   host?: string;
@@ -778,7 +783,9 @@ Bnjsx.register((config: AppOptions) => {
 
   config.globals = {
     ...config.globals,
-    base: base(config.host, config.protocol, config.port),
+    base: isStr(config.base)
+      ? config.base
+      : base(config.host, config.protocol, config.port),
   };
 
   return config;
