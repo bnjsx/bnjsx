@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## **Bnjsx@2.0.4 - 2025-09-13**
+
+### New
+
+- **`base` config option** - Set a production domain for generating URLs.
+  - `request.base` uses `base` if defined; otherwise it falls back to the combination of `host`, `port`, and `protocol`.
+  - Useful in production when `host` is `0.0.0.0` or an IP address, ensuring generated URLs use your real domain (e.g., `https://example.com`).
+
 ## **Bnjsx@2.0.3 - 2025-09-06**
 
 ### Enhanced

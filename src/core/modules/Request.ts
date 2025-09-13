@@ -26,13 +26,13 @@ export interface Request<
   cookies: Record<string, string>;
 
   /** The protocol used for the request (e.g., HTTP or HTTPS). */
-  protocol: 'http' | 'https';
+  protocol: 'http' | 'https' | string;
 
   /** The hostname from the request URL. */
   host: string;
 
   /** The port number used for the request. */
-  port: string;
+  port: string | number;
 
   /** The resolved client IP address. */
   ip: string;
@@ -95,7 +95,6 @@ export interface Request<
 
   /**
    * Gets the base app URL from config (e.g., `https://example.com`).
-   * Omits port if using default (80 for HTTP, 443 for HTTPS).
    *
    * @returns The base URL as a string.
    */
@@ -138,7 +137,9 @@ IncomingMessage.prototype.getIp = function (): string {
 
 // @ts-ignore
 IncomingMessage.prototype.getBase = function () {
-  const { host, port, protocol } = config().loadSync();
+  const { host, port, protocol, base } = config().loadSync();
+
+  if (base) return base;
 
   const isDefaultPort =
     (protocol === 'http' && port === 80) ||

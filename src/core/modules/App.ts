@@ -317,25 +317,20 @@ export class App extends EventEmitter {
    */
   private process(req: Request, res: Response): Promise<void> {
     return new Promise((resolve, reject) => {
-      const { protocol, host, port } = this.options;
-      const base = `${protocol}://${host}:${port}`;
+      const base = req.getBase();
       const url = new URL(req.url, base);
 
-      req.href = url.pathname + url.search;
-      req.search = url.search;
-      req.protocol = protocol;
-      req.host = url.hostname;
-      req.port = url.port;
-      req.path = url.pathname;
-      req.query = url.searchParams;
-
-      // Access res in req and reverse
       req.response = res;
       res.request = req;
-
-      // Set ip & base
+      req.base = base;
+      req.href = url.pathname + url.search;
+      req.search = url.search;
+      req.host = url.hostname;
+      req.path = url.pathname;
+      req.query = url.searchParams;
+      req.protocol = url.protocol.replace(':', '');
+      req.port = url.port || this.options.port;
       req.ip = req.getIp();
-      req.base = req.getBase();
 
       const issue = async () => {
         throw new NotFoundError(`Resource not found at '${req.url}'`);

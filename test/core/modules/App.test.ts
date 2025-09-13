@@ -176,7 +176,7 @@ describe('App class', () => {
     it('should throw an error for invalid middleware', () => {
       app.use(async (req, res) => {});
 
-      // Invalid middleware function
+      // @ts-ignore
       expect(() => app.use(((a, b, c, d) => {}) as any)).toThrow(AppError);
       expect(() => app.use('foo' as any)).toThrow(AppError);
     });
@@ -352,7 +352,7 @@ describe('App class', () => {
         url: '/',
         method: 'GET',
         getIp: jest.fn(),
-        getBase: jest.fn(),
+        getBase: jest.fn(() => 'http://localhost:2025'),
       };
       res = {
         writableEnded: false,
@@ -380,7 +380,7 @@ describe('App class', () => {
       const router = new Router().get('/posts', getPosts);
 
       const User = class extends Service {
-        constructor(req, res) {
+        constructor(req: any, res: any) {
           super(req, res);
 
           this.get('/users', getUsers); // match and exec getUsers
@@ -418,7 +418,7 @@ describe('App class', () => {
       const router = new Router().get('/posts', getPosts);
 
       const User = class extends Service {
-        constructor(req, res) {
+        constructor(req: any, res: any) {
           super(req, res);
 
           this.get('/users', getUsers); // match and exec getUsers
@@ -456,7 +456,7 @@ describe('App class', () => {
       const router = new Router().get('/', getPosts);
 
       const User = class extends Service {
-        constructor(req, res) {
+        constructor(req: any, res: any) {
           super(req, res);
 
           this.get('/', getUsers); // match and exec getUsers
@@ -574,7 +574,7 @@ describe('App class', () => {
       });
 
       const User = class extends Service {
-        constructor(req, res) {
+        constructor(req: any, res: any) {
           super(req, res);
           this.get('/users', getUsers);
         }
@@ -597,7 +597,7 @@ describe('App class', () => {
       });
 
       const User = class extends Service {
-        constructor(req, res) {
+        constructor(req: any, res: any) {
           super(req, res);
           this.get('/users', getUsers);
         }
